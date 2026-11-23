@@ -71,12 +71,22 @@ interface ActiveUserSession {
   userId: string;
   name: string;
   email: string;
+  createdAt?: string;
   method: "google";
+}
+
+interface RegisteredUserRecord {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  created_at: string;
+  last_login_at: string;
+  total_seconds_spent: number;
 }
 
 const USER_AUTH_KEY = "sweetie_ai_user_session_v3";
 const QUESTION_BACKUP_KEY = "sweetie_stored_questions_v1";
-const USERS_BACKUP_KEY = "sweetie_registered_users_v1";
+const USERS_BACKUP_KEY = "sweetie_registered_users_v2";
 const NAME_KEY = "sweetie_visitor_name";
 
 const PETAL_PALETTE = [
@@ -357,56 +367,76 @@ async function storeUserQuestionRecord(params: {
   }
 }
 
-async function recordUserLoginActivity(params: {
+async function syncUserProfileAndTime(params: {
   userId: string;
   userName: string;
   userEmail: string;
   accountCreatedAt?: string;
+  addSeconds?: number;
+  preserveLastLogin?: boolean;
 }) {
   const nowIso = new Date().toISOString();
-  const createdIso = params.accountCreatedAt || nowIso;
+  const addedSecs = Math.max(0, Math.floor(params.addSeconds ?? 0));
+
+  let existingCreatedAt = params.accountCreatedAt || nowIso;
+  let existingLastLoginAt = nowIso;
+  let existingSeconds = 0;
 
   try {
     const raw = localStorage.getItem(USERS_BACKUP_KEY);
-    const list = raw
-      ? (JSON.parse(raw) as Array<{
-          user_id: string;
-          user_name: string;
-          user_email: string;
-          created_at: string;
-          last_login_at: string;
-        }>)
-      : [];
+    const list = raw ? (JSON.parse(raw) as RegisteredUserRecord[]) : [];
+    const found = list.find((u) => u.user_id === params.userId);
+    if (found) {
+      if (found.created_at) existingCreatedAt = found.created_at;
+      if (found.last_login_at) existingLastLoginAt = found.last_login_at;
+      existingSeconds = Number(found.total_seconds_spent || 0);
+    }
+  } catch {
+    // Ignored
+  }
 
-    const existing = list.find((u) => u.user_id === params.userId);
-    const updated = {
-      user_id: params.userId,
-      user_name: params.userName,
-      user_email: params.userEmail,
-      created_at: existing?.created_at || createdIso,
-      last_login_at: nowIso,
-    };
+  try {
+    const { data: remoteRow } = await supabase
+      .from("sweetie_users")
+      .select("created_at, last_login_at, total_seconds_spent")
+      .eq("user_id", params.userId)
+      .maybeSingle();
 
-    const next = [
-      updated,
-      ...list.filter((u) => u.user_id !== params.userId),
-    ];
+    if (remoteRow) {
+      if (remoteRow.created_at) existingCreatedAt = String(remoteRow.created_at);
+      if (remoteRow.last_login_at)
+        existingLastLoginAt = String(remoteRow.last_login_at);
+      existingSeconds = Math.max(
+        existingSeconds,
+        Number(remoteRow.total_seconds_spent || 0)
+      );
+    }
+  } catch {
+    // Ignored
+  }
+
+  const record: RegisteredUserRecord = {
+    user_id: params.userId,
+    user_name: params.userName,
+    user_email: params.userEmail,
+    created_at: existingCreatedAt,
+    last_login_at: params.preserveLastLogin ? existingLastLoginAt : nowIso,
+    total_seconds_spent: existingSeconds + addedSecs,
+  };
+
+  try {
+    const raw = localStorage.getItem(USERS_BACKUP_KEY);
+    const list = raw ? (JSON.parse(raw) as RegisteredUserRecord[]) : [];
+    const next = [record, ...list.filter((u) => u.user_id !== params.userId)];
     localStorage.setItem(USERS_BACKUP_KEY, JSON.stringify(next));
   } catch {
     // Ignored
   }
 
   try {
-    await supabase.from("sweetie_users").upsert(
-      {
-        user_id: params.userId,
-        user_name: params.userName,
-        user_email: params.userEmail,
-        created_at: createdIso,
-        last_login_at: nowIso,
-      },
-      { onConflict: "user_id" }
-    );
+    await supabase
+      .from("sweetie_users")
+      .upsert(record, { onConflict: "user_id" });
   } catch {
     // Ignored
   }
@@ -442,12 +472,15 @@ export default function SweetieAIPage() {
   const speakSessionRef = useRef(0);
 
   const hydrateUserSession = useCallback(
-    async (user: {
-      id?: string;
-      email?: string | null;
-      created_at?: string;
-      user_metadata?: Record<string, unknown>;
-    }) => {
+    async (
+      user: {
+        id?: string;
+        email?: string | null;
+        created_at?: string;
+        user_metadata?: Record<string, unknown>;
+      },
+      isFreshLogin = true
+    ) => {
       const email = user.email || "";
       if (!email) return;
 
@@ -462,6 +495,7 @@ export default function SweetieAIPage() {
         userId,
         name: derivedGoogleName,
         email,
+        createdAt: user.created_at,
         method: "google",
       };
 
@@ -470,11 +504,12 @@ export default function SweetieAIPage() {
       setNameInput(derivedGoogleName);
       setAuthError("");
 
-      void recordUserLoginActivity({
+      void syncUserProfileAndTime({
         userId,
         userName: derivedGoogleName,
         userEmail: email,
         accountCreatedAt: user.created_at,
+        preserveLastLogin: !isFreshLogin,
       });
 
       try {
@@ -558,16 +593,22 @@ export default function SweetieAIPage() {
   );
 
   useEffect(() => {
+    let restoredFromSession = false;
     try {
       const savedSession = sessionStorage.getItem(USER_AUTH_KEY);
       if (savedSession) {
         const parsed = JSON.parse(savedSession) as ActiveUserSession;
         if (parsed?.email) {
-          void hydrateUserSession({
-            id: parsed.userId,
-            email: parsed.email,
-            user_metadata: { full_name: parsed.name },
-          });
+          restoredFromSession = true;
+          void hydrateUserSession(
+            {
+              id: parsed.userId,
+              email: parsed.email,
+              created_at: parsed.createdAt,
+              user_metadata: { full_name: parsed.name },
+            },
+            false
+          );
         }
       }
     } catch {
@@ -576,20 +617,67 @@ export default function SweetieAIPage() {
 
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
-        void hydrateUserSession(data.user);
+        void hydrateUserSession(data.user, !restoredFromSession);
       }
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        void hydrateUserSession(session.user);
+        void hydrateUserSession(
+          session.user,
+          event === "SIGNED_IN" || event === "USER_UPDATED"
+        );
       }
     });
 
     return () => subscription.unsubscribe();
   }, [hydrateUserSession]);
+
+  // Track active seconds spent on the website while logged in and visible
+  useEffect(() => {
+    if (!userSession) return;
+
+    let unsyncedSeconds = 0;
+
+    const flushTime = () => {
+      if (unsyncedSeconds <= 0) return;
+      const secsToSave = unsyncedSeconds;
+      unsyncedSeconds = 0;
+      void syncUserProfileAndTime({
+        userId: userSession.userId,
+        userName: visitorName || userSession.name,
+        userEmail: userSession.email,
+        accountCreatedAt: userSession.createdAt,
+        addSeconds: secsToSave,
+        preserveLastLogin: true,
+      });
+    };
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        unsyncedSeconds += 5;
+        if (unsyncedSeconds >= 10) {
+          flushTime();
+        }
+      }
+    }, 5000);
+
+    const handleVisibilityOrUnload = () => {
+      flushTime();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrUnload);
+    window.addEventListener("pagehide", handleVisibilityOrUnload);
+
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityOrUnload);
+      window.removeEventListener("pagehide", handleVisibilityOrUnload);
+      flushTime();
+    };
+  }, [userSession, visitorName]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
