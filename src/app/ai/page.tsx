@@ -52,9 +52,9 @@ interface SpeechRecognizerLike {
 const NAME_KEY = "parvati_sweetie_visitor_name";
 
 const THINKING_PHRASES = [
-  "Hold on, thinking with maximum cute brainpower...",
-  "Sweetie is cooking up a sweet & flirty reply...",
-  "Checking Parvati's headshot-queen vibes...",
+  "Hold on, rolling my cute eyes & thinking... 🙄✨",
+  "Sweetie is cooking up a funny little comeback... 😏💅",
+  "Don't rush me, good attitude takes time... 🌸😌",
 ];
 
 function getTimeNow() {
@@ -66,8 +66,8 @@ function getTimeNow() {
 }
 
 /**
- * Strips all Unicode emojis, pictographs, symbols, and emoji-like descriptions
- * so speech synthesis NEVER reads an emoji name out loud.
+ * Strips all Unicode emojis, pictographs, symbols, and emoji word-labels
+ * so speech synthesis NEVER reads emoji names out loud.
  */
 function sanitizeForSpeech(raw: string): string {
   return raw
@@ -76,7 +76,7 @@ function sanitizeForSpeech(raw: string): string {
     .replace(/[\u{FE00}-\u{FE0F}]/gu, "")
     .replace(/[\u{200D}]/gu, "")
     .replace(
-      /\b(smiling face|blushing|cherry blossom|sparkles|heart|red heart|grinning|laughing|crying|sob|tears|wink|kiss|emoji)\b/gi,
+      /\b(smiling face|blushing|cherry blossom|sparkles|heart|red heart|grinning|laughing|crying|sob|tears|wink|kiss|rolling eyes|eye roll|emoji)\b/gi,
       " "
     )
     .replace(/\*[^*]+\*/g, " ")
@@ -86,87 +86,82 @@ function sanitizeForSpeech(raw: string): string {
 
 function hasHindiScriptOrWords(text: string): boolean {
   if (/[\u0900-\u097F]/.test(text)) return true;
-  return /\b(kya|hai|hain|mera|meri|tum|aap|kaise|kaisi|kyun|kyu|acha|achha|batao|sunao|pyaar|dil|yaar|haan|nahi|nhi|bhai|didi|shukriya|dhanyavaad|khush|udas|rona|hasna|bilkul|zaroor|headshot)\b/i.test(
+  return /\b(kya|hai|hain|mera|meri|tum|aap|kaise|kaisi|kyun|kyu|acha|achha|batao|sunao|pyaar|dil|yaar|haan|nahi|nhi|bhai|didi|shukriya|dhanyavaad|khush|udas|rona|hasna|bilkul|zaroor|suno|dekho|chalo|abhi|bahut|thoda)\b/i.test(
     text
   );
 }
 
-type EmotionMood = "laugh" | "smile" | "cry" | "emotional" | "calm";
+/**
+ * Normalizes common Hinglish spellings so Indian/Hindi speech engines pronounce them more naturally
+ * without long awkward pauses.
+ */
+function normalizeHindiPhonetics(text: string): string {
+  return text
+    .replace(/\bachha\b|\bacha\b/gi, "achchha")
+    .replace(/\bkyun\b|\bkyu\b/gi, "kyon")
+    .replace(/\bnahi\b|\bnhi\b/gi, "nahin")
+    .replace(/\bthoda\b/gi, "thora")
+    .replace(/\bkhush\b/gi, "khush")
+    .replace(/[।]/g, ". ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+type EmotionMood = "laugh" | "smile" | "cry" | "emotional" | "calm" | "attitude";
 
 function detectEmotionMood(text: string): EmotionMood {
   const lower = text.toLowerCase();
-  if (
-    /\b(haha|hehe|lol|joke|funny|laugh|roast|haso|hansi|mazak|flirt|blush)\b/i.test(
-      lower
-    )
-  ) {
+  if (/\b(haha|hehe|lol|joke|funny|laugh|haso|hansi|mazak|funny)\b/i.test(lower)) {
     return "laugh";
   }
   if (/\b(cry|crying|sad|sorry|hurt|miss|lonely|tear|rona|udas|dukhi)\b/i.test(lower)) {
     return "cry";
   }
-  if (
-    /\b(love|sweet|cute|heart|care|hug|special|emotional|pyaar|dil|jaan|headshot)\b/i.test(
-      lower
-    )
-  ) {
+  if (/\b(love|sweet|cute|heart|care|hug|special|emotional|pyaar|dil)\b/i.test(lower)) {
     return "emotional";
   }
   if (/\b(calm|relax|peace|slow|gentle|breathe|aaram|shanti|sleep)\b/i.test(lower)) {
     return "calm";
   }
+  if (/\b(attitude|whatever|seriously|huh|sassy|boss|bother)\b/i.test(lower)) {
+    return "attitude";
+  }
   return "smile";
 }
 
-function buildSpokenChunks(
+function buildSmoothSpokenText(
   cleanText: string,
   mood: EmotionMood,
   isHindi: boolean
-): string[] {
-  const rawChunks = cleanText
-    .split(/(?<=[.!?।,;])\s+/)
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (rawChunks.length === 0) return [];
-
-  const chunks: string[] = [];
+): string {
+  const prepared = isHindi ? normalizeHindiPhonetics(cleanText) : cleanText;
 
   if (mood === "laugh") {
-    chunks.push(isHindi ? "Hehe, suno na..." : "Hehe, listen to this...");
-    rawChunks.forEach((chunk, idx) => {
-      chunks.push(chunk);
-      if (idx === Math.floor(rawChunks.length / 2)) {
-        chunks.push(isHindi ? "Hehe, kitna cute hai!" : "Hehe, blushing already?");
-      }
-    });
-    chunks.push("Hehe!");
-    return chunks;
+    return isHindi
+      ? `Hehe, suno na! ${prepared} Hehe!`
+      : `Hehe, listen! ${prepared} Hehe!`;
   }
-
+  if (mood === "attitude") {
+    return isHindi
+      ? `Hmm, sun liya. ${prepared}`
+      : `Hmph, okay fine. ${prepared}`;
+  }
   if (mood === "cry") {
-    chunks.push(isHindi ? "Aww... dil bhar aaya..." : "Aww... sniffle...");
-    chunks.push(...rawChunks);
-    return chunks;
+    return isHindi
+      ? `Aww, dil bhar aaya. ${prepared}`
+      : `Aww, sniffle. ${prepared}`;
   }
-
   if (mood === "emotional") {
-    chunks.push(isHindi ? "Aww, sach mein..." : "Aww, smiling softly...");
-    chunks.push(...rawChunks);
-    return chunks;
+    return isHindi
+      ? `Aww, sach mein? ${prepared}`
+      : `Aww, softly. ${prepared}`;
   }
-
   if (mood === "calm") {
-    chunks.push(
-      isHindi ? "Shh... aaram se suno..." : "Shh... take a gentle breath..."
-    );
-    chunks.push(...rawChunks);
-    return chunks;
+    return isHindi
+      ? `Aaram se suno. ${prepared}`
+      : `Take a soft breath. ${prepared}`;
   }
-
-  chunks.push(isHindi ? "Hmm, smiling..." : "Mmm, smiling...");
-  chunks.push(...rawChunks);
-  return chunks;
+  return isHindi ? `Hmm! ${prepared}` : `Mmm! ${prepared}`;
 }
 
 export default function ParvatiAIPage() {
@@ -188,10 +183,8 @@ export default function ParvatiAIPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognizerLike | null>(null);
   const holdingRef = useRef(false);
-  const speakSessionRef = useRef(0);
 
   const stopSpeaking = useCallback(() => {
-    speakSessionRef.current += 1;
     setSpeakingMessageId(null);
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
@@ -202,6 +195,7 @@ export default function ParvatiAIPage() {
     }
   }, []);
 
+  // Single continuous utterance per click so commas/periods never cause long dead pauses
   const speakMessage = useCallback(
     (messageId: string, rawText: string) => {
       if (speakingMessageId === messageId) {
@@ -220,11 +214,8 @@ export default function ParvatiAIPage() {
       const mood = detectEmotionMood(stripped);
       setActiveMood(mood);
 
-      const chunks = buildSpokenChunks(stripped, mood, isHindi);
-      if (chunks.length === 0) return;
-
-      const sessionId = speakSessionRef.current + 1;
-      speakSessionRef.current = sessionId;
+      const spokenText = buildSmoothSpokenText(stripped, mood, isHindi);
+      if (!spokenText) return;
 
       try {
         window.speechSynthesis.cancel();
@@ -258,71 +249,51 @@ export default function ParvatiAIPage() {
           null;
       }
 
+      const utterance = new SpeechSynthesisUtterance(spokenText);
+      utterance.lang = isHindi
+        ? chosenVoice?.lang || "hi-IN"
+        : chosenVoice?.lang || "en-IN";
+      if (chosenVoice) {
+        utterance.voice = chosenVoice;
+      }
+
+      // Soft baby-girl tone with natural flow (no slow drag after punctuation)
+      if (mood === "laugh") {
+        utterance.pitch = 1.38;
+        utterance.rate = 1.08;
+        utterance.volume = 0.9;
+      } else if (mood === "attitude") {
+        utterance.pitch = 1.34;
+        utterance.rate = 1.04;
+        utterance.volume = 0.88;
+      } else if (mood === "cry") {
+        utterance.pitch = 1.28;
+        utterance.rate = 0.92;
+        utterance.volume = 0.82;
+      } else if (mood === "emotional") {
+        utterance.pitch = 1.35;
+        utterance.rate = 0.98;
+        utterance.volume = 0.86;
+      } else if (mood === "calm") {
+        utterance.pitch = 1.26;
+        utterance.rate = 0.95;
+        utterance.volume = 0.82;
+      } else {
+        utterance.pitch = 1.35;
+        utterance.rate = 1.02;
+        utterance.volume = 0.86;
+      }
+
+      utterance.onstart = () => setSpeakingMessageId(messageId);
+      utterance.onend = () => setSpeakingMessageId(null);
+      utterance.onerror = () => setSpeakingMessageId(null);
+
       setSpeakingMessageId(messageId);
-
-      const speakChunkAt = (index: number) => {
-        if (speakSessionRef.current !== sessionId) return;
-        if (index >= chunks.length) {
-          setSpeakingMessageId(null);
-          return;
-        }
-
-        const phrase = chunks[index];
-        const smileLift = index % 2 === 0 ? 0.05 : -0.03;
-
-        let basePitch = 1.45;
-        let baseRate = 0.94;
-        let baseVolume = 0.96;
-
-        if (mood === "laugh") {
-          basePitch = 1.5;
-          baseRate = 1.03;
-          baseVolume = 1.0;
-        } else if (mood === "cry") {
-          basePitch = 1.37;
-          baseRate = 0.82;
-          baseVolume = 0.85;
-        } else if (mood === "emotional") {
-          basePitch = 1.43;
-          baseRate = 0.88;
-          baseVolume = 0.93;
-        } else if (mood === "calm") {
-          basePitch = 1.33;
-          baseRate = 0.84;
-          baseVolume = 0.86;
-        }
-
-        const utterance = new SpeechSynthesisUtterance(phrase);
-        utterance.lang = isHindi
-          ? chosenVoice?.lang || "hi-IN"
-          : chosenVoice?.lang || "en-IN";
-        if (chosenVoice) {
-          utterance.voice = chosenVoice;
-        }
-        utterance.pitch = Math.min(2, Math.max(0.5, basePitch + smileLift));
-        utterance.rate = Math.min(1.6, Math.max(0.6, baseRate));
-        utterance.volume = baseVolume;
-
-        utterance.onend = () => {
-          if (speakSessionRef.current !== sessionId) return;
-          setTimeout(() => {
-            speakChunkAt(index + 1);
-          }, 95);
-        };
-
-        utterance.onerror = () => {
-          if (speakSessionRef.current !== sessionId) return;
-          speakChunkAt(index + 1);
-        };
-
-        try {
-          window.speechSynthesis.speak(utterance);
-        } catch {
-          setSpeakingMessageId(null);
-        }
-      };
-
-      speakChunkAt(0);
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        setSpeakingMessageId(null);
+      }
     },
     [speakingMessageId, stopSpeaking]
   );
@@ -346,13 +317,31 @@ export default function ParvatiAIPage() {
       setInput("");
       setLoading(true);
 
+      // Filter out any prior assistant messages that repeatedly mention Free Fire unless user asked
+      const askedAboutGame = /\b(free fire|ff|game|gaming|headshot)\b/i.test(text);
+      const filteredHistory = askedAboutGame
+        ? nextMessages
+        : nextMessages.map((m) =>
+            m.role === "assistant"
+              ? {
+                  ...m,
+                  content: m.content.replace(
+                    /[^.!?]*\b(free fire|headshot queen|ff)\b[^.!?]*[.!?]?/gi,
+                    ""
+                  ),
+                }
+              : m
+          );
+
       try {
         const res = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             visitorName,
-            messages: nextMessages.map((m) => ({
+            styleHint:
+              "Be funny, cute, expressive with emojis, and have a tiny playful attitude. Do not bring up Free Fire unless the user asks about games.",
+            messages: filteredHistory.map((m) => ({
               role: m.role,
               content: m.content,
             })),
@@ -361,7 +350,7 @@ export default function ParvatiAIPage() {
 
         const data = (await res.json()) as { reply?: string; error?: string };
         const replyText = res.ok
-          ? data.reply ?? "Aww, my little mind blinked for a second! Ask me again cutie"
+          ? data.reply ?? "Hmph, my cute brain blinked for a second! Ask me again 🙄🌸"
           : `⚠️ ${data.error ?? "Failed to reply."}`;
 
         setMessages((prev) => [
@@ -379,7 +368,7 @@ export default function ParvatiAIPage() {
           {
             id: `err-${Date.now()}`,
             role: "assistant",
-            content: "Aww, something went wrong reaching Sweetie. Please try again",
+            content: "Aww, network got sleepy 🙄🌸 Try again in a bit!",
             time: getTimeNow(),
           },
         ]);
@@ -408,8 +397,8 @@ export default function ParvatiAIPage() {
         id: "welcome",
         role: "assistant",
         content: saved
-          ? `Heyyy ${saved}! Sweetie is smiling so brightly to see you. Tap the sound icon on any reply whenever you want me to speak!`
-          : "Heyyy cutie! I'm Sweetie. Replies appear in text by default—tap the sound logo on any response whenever you want me to speak it aloud!",
+          ? `Ohhh, look who's here—${saved}! 😏✨ Sweetie is smiling, cute, and has just a tiny bit of attitude today 🌸 Tap Speak on any reply if you wanna hear my soft voice!`
+          : "Heyyy cutie! 😏🌸 I'm Sweetie—funny, expressive, and a little sassy. Replies stay text-only until you tap Speak on a message! ✨💅",
         time: getTimeNow(),
       },
     ]);
@@ -551,7 +540,7 @@ export default function ParvatiAIPage() {
         id: `reset-${Date.now()}`,
         role: "assistant",
         content:
-          "Fresh slate, cutie! Text-only by default—tap the sound icon on any reply to hear me speak.",
+          "Okay fine, fresh slate! 😏🌸 Cute & sassy mode is ready whenever you are ✨",
         time: getTimeNow(),
       },
     ]);
@@ -577,9 +566,9 @@ export default function ParvatiAIPage() {
               Sweetie🌸
             </h1>
             <p className="text-xs text-slate-600">
-              Tap sound on any reply to speak • Mood:{" "}
+              Soft baby voice • Vibe:{" "}
               <span className="font-mono font-bold text-rose-600">
-                {speakingNow ? `${activeMood} (talking)` : activeMood}
+                {speakingNow ? `${activeMood} (speaking)` : activeMood}
               </span>
             </p>
           </div>
@@ -624,7 +613,7 @@ export default function ParvatiAIPage() {
         </div>
       </div>
 
-      {/* Entire AI Chat Box — Animates smoothly while holding mic OR speaking a selected response */}
+      {/* Entire AI Chat Box — Animates smoothly while holding mic OR speaking */}
       <div
         className={`rounded-[2rem] bg-white/95 border shadow-xl overflow-hidden flex flex-col h-[66vh] min-h-[440px] transition-all duration-300 ${
           isChatAnimated
@@ -641,7 +630,7 @@ export default function ParvatiAIPage() {
 
         {!holdingMic && speakingNow && (
           <div className="px-4 py-2 bg-gradient-to-r from-pink-500 via-rose-400 to-amber-400 text-white text-xs font-mono font-bold flex items-center justify-between animate-pulse">
-            <span>Sweetie is talking with a smile ({activeMood})...</span>
+            <span>Sweetie is talking softly ({activeMood})...</span>
             <button
               type="button"
               onClick={stopSpeaking}
