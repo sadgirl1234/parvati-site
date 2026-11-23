@@ -69,11 +69,13 @@ interface Petal {
 }
 
 interface ActiveUserSession {
-  identifier: string;
+  userId: string;
+  name: string;
+  email: string;
   method: "google";
 }
 
-const USER_AUTH_KEY = "sweetie_ai_user_session_v1";
+const USER_AUTH_KEY = "sweetie_ai_user_session_v2";
 const QUESTION_BACKUP_KEY = "sweetie_stored_questions_v1";
 const NAME_KEY = "sweetie_visitor_name";
 
@@ -126,6 +128,11 @@ function getTimeNow() {
     minute: "2-digit",
     hour12: true,
   }).format(new Date());
+}
+
+function formatHandle(name: string): string {
+  const cleaned = name.trim().replace(/\s+/g, "");
+  return cleaned ? `@${cleaned}` : "@cutie";
 }
 
 function sanitizeForSpeech(raw: string): string {
@@ -280,23 +287,28 @@ function drawRealisticPetal(ctx: CanvasRenderingContext2D, p: Petal) {
 }
 
 async function storeUserQuestionRecord(params: {
-  userIdentifier: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
   authMethod: "google";
   question: string;
   aiReply: string;
 }) {
+  const nowIso = new Date().toISOString();
   const record = {
-    user_identifier: params.userIdentifier,
+    user_id: params.userId,
+    user_name: params.userName,
+    user_identifier: params.userEmail,
     auth_method: params.authMethod,
     question: params.question,
     ai_reply: params.aiReply,
-    created_at: new Date().toISOString(),
+    created_at: nowIso,
   };
 
   try {
     const existingRaw = localStorage.getItem(QUESTION_BACKUP_KEY);
     const existing = existingRaw ? (JSON.parse(existingRaw) as unknown[]) : [];
-    const next = [{ id: Date.now(), ...record }, ...existing].slice(0, 100);
+    const next = [{ id: Date.now(), ...record }, ...existing].slice(0, 150);
     localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(next));
   } catch {
     // Ignored
@@ -338,13 +350,70 @@ export default function SweetieAIPage() {
   const holdingRef = useRef(false);
   const speakSessionRef = useRef(0);
 
+  const applyAuthenticatedUser = useCallback(
+    (user: {
+      id?: string;
+      email?: string | null;
+      user_metadata?: Record<string, unknown>;
+    }) => {
+      const email = user.email || "";
+      if (!email) return;
+
+      const meta = user.user_metadata || {};
+      const rawName =
+        (typeof meta.full_name === "string" && meta.full_name) ||
+        (typeof meta.name === "string" && meta.name) ||
+        email.split("@")[0] ||
+        "User";
+
+      const sess: ActiveUserSession = {
+        userId: user.id || email,
+        name: rawName.trim(),
+        email,
+        method: "google",
+      };
+
+      setUserSession(sess);
+      setVisitorName(sess.name);
+      setNameInput(sess.name);
+      setAuthError("");
+
+      try {
+        sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
+        localStorage.setItem(NAME_KEY, sess.name);
+      } catch {
+        // Ignored
+      }
+
+      setMessages([
+        {
+          id: `welcome-${Date.now()}`,
+          role: "assistant",
+          content: `Welcome ${formatHandle(sess.name)}! 😏💖 Sweetie just noticed you logged in (${sess.name} • ${sess.email}) 🌸 Tap Speak on any reply whenever you want to hear my soft voice! ✨`,
+          time: getTimeNow(),
+        },
+      ]);
+    },
+    []
+  );
+
   useEffect(() => {
     try {
       const savedSession = sessionStorage.getItem(USER_AUTH_KEY);
       if (savedSession) {
         const parsed = JSON.parse(savedSession) as ActiveUserSession;
-        if (parsed?.identifier) {
+        if (parsed?.email) {
           setUserSession(parsed);
+          setVisitorName(parsed.name);
+          setNameInput(parsed.name);
+          setMessages([
+            {
+              id: `welcome-restored-${Date.now()}`,
+              role: "assistant",
+              content: `Welcome ${formatHandle(parsed.name)}! 😏💖 Sweetie is ready for you (${parsed.name} • ${parsed.email}) 🌸 Tap Speak on any reply to hear my soft voice! ✨`,
+              time: getTimeNow(),
+            },
+          ]);
         }
       }
     } catch {
@@ -352,42 +421,21 @@ export default function SweetieAIPage() {
     }
 
     supabase.auth.getUser().then(({ data }) => {
-      const email = data?.user?.email;
-      if (email) {
-        const sess: ActiveUserSession = {
-          identifier: email,
-          method: "google",
-        };
-        setUserSession(sess);
-        try {
-          sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
-        } catch {
-          // Ignored
-        }
+      if (data?.user) {
+        applyAuthenticatedUser(data.user);
       }
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      const email = session?.user?.email;
-      if (email) {
-        const sess: ActiveUserSession = {
-          identifier: email,
-          method: "google",
-        };
-        setUserSession(sess);
-        setAuthError("");
-        try {
-          sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
-        } catch {
-          // Ignored
-        }
+      if (session?.user) {
+        applyAuthenticatedUser(session.user);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [applyAuthenticatedUser]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -681,6 +729,8 @@ export default function SweetieAIPage() {
 
       stopSpeaking();
 
+      const activeName = visitorName.trim() || userSession.name;
+
       const userMsg: Message = {
         id: `u-${Date.now()}`,
         role: "user",
@@ -716,9 +766,8 @@ export default function SweetieAIPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            visitorName,
-            styleHint:
-              "Be extra charming, funny, cute, expressive with emojis, and have a playful little attitude. Do not bring up Free Fire unless asked.",
+            visitorName: activeName,
+            styleHint: `The user's name is ${activeName} (${formatHandle(activeName)}). Be extra charming, funny, cute, expressive with emojis, and have a playful little attitude. Do not bring up Free Fire unless asked.`,
             messages: filteredHistory.map((m) => ({
               role: m.role,
               content: m.content,
@@ -755,7 +804,9 @@ export default function SweetieAIPage() {
       } finally {
         setLoading(false);
         await storeUserQuestionRecord({
-          userIdentifier: userSession.identifier,
+          userId: userSession.userId,
+          userName: activeName,
+          userEmail: userSession.email,
           authMethod: userSession.method,
           question: text,
           aiReply: finalReply,
@@ -764,31 +815,6 @@ export default function SweetieAIPage() {
     },
     [loading, stopSpeaking, userSession, visitorName]
   );
-
-  useEffect(() => {
-    let saved = "";
-    try {
-      const stored = localStorage.getItem(NAME_KEY);
-      if (stored) saved = stored;
-    } catch {
-      // Ignored
-    }
-    if (saved) {
-      setVisitorName(saved);
-      setNameInput(saved);
-    }
-
-    setMessages([
-      {
-        id: "welcome",
-        role: "assistant",
-        content: saved
-          ? `Heyyy ${saved}! 😏💖 Sweetie is glowing with cute attitude today 🌸 Tap Speak on any reply to hear my soft voice!`
-          : "Heyyy cutie! 😏💖 I'm Sweetie—cute, funny, and a little sassy. Tap Speak on any reply whenever you want to hear my soft voice! ✨🌸",
-        time: getTimeNow(),
-      },
-    ]);
-  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -921,12 +947,12 @@ export default function SweetieAIPage() {
   const handleClear = () => {
     stopSpeaking();
     setMicError("");
+    const activeName = visitorName.trim() || userSession?.name || "cutie";
     setMessages([
       {
         id: `reset-${Date.now()}`,
         role: "assistant",
-        content:
-          "Okay fine, fresh slate! 😏💖 Cute & sassy mode is ready whenever you are ✨🌸",
+        content: `Okay fine ${formatHandle(activeName)}, fresh slate! 😏💖 Cute & sassy mode is ready whenever you are ✨🌸`,
         time: getTimeNow(),
       },
     ]);
@@ -1001,8 +1027,14 @@ export default function SweetieAIPage() {
                   <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900">
                     Sweetie🌸
                   </h1>
-                  <p className="text-xs text-slate-600">
-                    {userSession.identifier} • Mood:{" "}
+                  <p className="text-xs text-slate-700 font-medium">
+                    <span className="font-bold text-slate-900">
+                      {userSession.name}
+                    </span>{" "}
+                    <span className="text-slate-500">({userSession.email})</span>
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Mood:{" "}
                     <span className="font-mono font-bold text-rose-600">
                       {speakingNow ? `${activeMood} (speaking)` : activeMood}
                     </span>
@@ -1038,7 +1070,7 @@ export default function SweetieAIPage() {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-mono font-bold text-rose-700 cursor-pointer"
                   >
                     <Smile size={13} />
-                    {visitorName ? `Hi, ${visitorName}` : "Tell me your name"}
+                    {`Hi, ${visitorName || userSession.name}`}
                   </button>
                 )}
 

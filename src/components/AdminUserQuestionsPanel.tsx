@@ -6,6 +6,8 @@ import { MessageSquareQuote, RefreshCw } from "lucide-react";
 
 interface StoredQuestion {
   id: string | number;
+  user_id?: string | null;
+  user_name?: string | null;
   user_identifier: string;
   auth_method: string;
   question: string;
@@ -36,10 +38,10 @@ export default function AdminUserQuestionsPanel() {
       const { data } = await supabase
         .from("sweetie_user_questions")
         .select(
-          "id, user_identifier, auth_method, question, ai_reply, created_at"
+          "id, user_id, user_name, user_identifier, auth_method, question, ai_reply, created_at"
         )
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(150);
 
       if (data && data.length > 0) {
         combined = data;
@@ -76,23 +78,37 @@ export default function AdminUserQuestionsPanel() {
 
       {items.length === 0 ? (
         <p className="text-xs text-slate-500">
-          No user questions recorded yet. Once a user logs in via Mobile or
-          Google OTP and asks a question on /ai, it appears here.
+          No user questions recorded yet. Once a user signs in with Google and
+          asks a question on /ai, it appears here.
         </p>
       ) : (
-        <div className="space-y-2.5 max-h-96 overflow-y-auto">
+        <div className="space-y-3 max-h-[32rem] overflow-y-auto">
           {items.map((row) => (
             <div
               key={row.id}
-              className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-1"
+              className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs space-y-1.5"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-slate-500">
-                <span className="font-bold text-rose-700">
-                  {row.user_identifier} ({row.auth_method})
+              <div className="flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] text-slate-600">
+                <div>
+                  <span className="font-bold text-slate-900">
+                    {row.user_name || "Unknown User"}
+                  </span>{" "}
+                  <span className="text-rose-700 font-semibold">
+                    ({row.user_identifier})
+                  </span>
+                </div>
+                <span className="text-slate-500">
+                  {new Date(row.created_at).toLocaleString("en-IN")}
                 </span>
-                <span>{new Date(row.created_at).toLocaleString("en-IN")}</span>
               </div>
-              <p className="font-semibold text-slate-900">Q: {row.question}</p>
+
+              <div className="text-[10px] font-mono text-slate-400 break-all">
+                User ID: {row.user_id || row.user_identifier}
+              </div>
+
+              <p className="font-semibold text-slate-900 pt-1">
+                Q: {row.question}
+              </p>
               {row.ai_reply && (
                 <p className="text-slate-600">A: {row.ai_reply}</p>
               )}
