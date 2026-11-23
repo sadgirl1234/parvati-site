@@ -12,6 +12,9 @@ import {
   Volume2,
   Square,
   Cog,
+  Lock,
+  Unlock,
+  KeyRound,
 } from "lucide-react";
 
 interface Message {
@@ -49,12 +52,14 @@ interface SpeechRecognizerLike {
   stop: () => void;
 }
 
-const NAME_KEY = "parvati_sweetie_visitor_name";
+const AI_ACCESS_PWD = "841694";
+const UNLOCK_SESSION_KEY = "sweetie_ai_unlocked_v1";
+const NAME_KEY = "sweetie_visitor_name";
 
 const THINKING_PHRASES = [
-  "Hold on, rolling my cute eyes & thinking... 🙄✨",
-  "Sweetie is cooking up a funny little comeback... 😏💅",
-  "Don't rush me, good attitude takes time... 🌸😌",
+  "Hold on, thinking with cute attitude... 🙄✨",
+  "Sweetie is cooking up a funny comeback... 😏💅",
+  "Give me a sec, making it extra cute... 🌸😌",
 ];
 
 function getTimeNow() {
@@ -66,8 +71,7 @@ function getTimeNow() {
 }
 
 /**
- * Strips all Unicode emojis, pictographs, symbols, and emoji word-labels
- * so speech synthesis NEVER reads emoji names out loud.
+ * Strips all emojis and emoji names so speech synthesis never reads emoji labels.
  */
 function sanitizeForSpeech(raw: string): string {
   return raw
@@ -84,27 +88,34 @@ function sanitizeForSpeech(raw: string): string {
     .trim();
 }
 
-function hasHindiScriptOrWords(text: string): boolean {
-  if (/[\u0900-\u097F]/.test(text)) return true;
-  return /\b(kya|hai|hain|mera|meri|tum|aap|kaise|kaisi|kyun|kyu|acha|achha|batao|sunao|pyaar|dil|yaar|haan|nahi|nhi|bhai|didi|shukriya|dhanyavaad|khush|udas|rona|hasna|bilkul|zaroor|suno|dekho|chalo|abhi|bahut|thoda)\b/i.test(
-    text
+function isHindiWord(word: string): boolean {
+  if (/[\u0900-\u097F]/.test(word)) return true;
+  return /^(kya|hai|hain|hoon|hu|mera|meri|mere|tum|aap|kaise|kaisi|kyun|kyu|kyon|acha|achha|achchha|batao|sunao|pyaar|dil|yaar|haan|nahi|nhi|nahin|bhai|didi|shukriya|dhanyavaad|khush|udas|rona|hasna|bilkul|zaroor|suno|dekho|chalo|abhi|bahut|thoda|thora|kaun|kahan|kidhar|mat|karo|karna|raha|rahi|rahe|tha|thi|the|ho|toh|aur|lekin|par|se|ko|ka|ki|ke|mein|main|ne)$/i.test(
+    word.replace(/[^a-zA-Z\u0900-\u097F]/g, "")
   );
 }
 
+function hasHindiText(text: string): boolean {
+  if (/[\u0900-\u097F]/.test(text)) return true;
+  const words = text.split(/\s+/);
+  return words.some(isHindiWord);
+}
+
 /**
- * Normalizes common Hinglish spellings so Indian/Hindi speech engines pronounce them more naturally
- * without long awkward pauses.
+ * Clarifies common Hinglish spellings into clear phonetics so speech engines
+ * pronounce each Hindi/Hinglish word clearly.
  */
-function normalizeHindiPhonetics(text: string): string {
-  return text
-    .replace(/\bachha\b|\bacha\b/gi, "achchha")
-    .replace(/\bkyun\b|\bkyu\b/gi, "kyon")
-    .replace(/\bnahi\b|\bnhi\b/gi, "nahin")
-    .replace(/\bthoda\b/gi, "thora")
-    .replace(/\bkhush\b/gi, "khush")
-    .replace(/[।]/g, ". ")
-    .replace(/\s+/g, " ")
-    .trim();
+function clarifyWordPhonetics(word: string): string {
+  const clean = word.replace(/[^a-zA-Z\u0900-\u097F'?!.,]/g, "");
+  const lower = clean.toLowerCase().replace(/[?!.,]/g, "");
+
+  if (lower === "acha" || lower === "achha") return "achchha";
+  if (lower === "kyun" || lower === "kyu") return "kyon";
+  if (lower === "nahi" || lower === "nhi") return "nahin";
+  if (lower === "thoda") return "thora";
+  if (lower === "hoon" || lower === "hu") return "hoon";
+  if (lower === "main") return "main";
+  return clean;
 }
 
 type EmotionMood = "laugh" | "smile" | "cry" | "emotional" | "calm" | "attitude";
@@ -123,48 +134,17 @@ function detectEmotionMood(text: string): EmotionMood {
   if (/\b(calm|relax|peace|slow|gentle|breathe|aaram|shanti|sleep)\b/i.test(lower)) {
     return "calm";
   }
-  if (/\b(attitude|whatever|seriously|huh|sassy|boss|bother)\b/i.test(lower)) {
+  if (/\b(attitude|whatever|seriously|huh|sassy|boss|hmph)\b/i.test(lower)) {
     return "attitude";
   }
   return "smile";
 }
 
-function buildSmoothSpokenText(
-  cleanText: string,
-  mood: EmotionMood,
-  isHindi: boolean
-): string {
-  const prepared = isHindi ? normalizeHindiPhonetics(cleanText) : cleanText;
+export default function SweetieAIPage() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [pwdInput, setPwdInput] = useState("");
+  const [pwdError, setPwdError] = useState("");
 
-  if (mood === "laugh") {
-    return isHindi
-      ? `Hehe, suno na! ${prepared} Hehe!`
-      : `Hehe, listen! ${prepared} Hehe!`;
-  }
-  if (mood === "attitude") {
-    return isHindi
-      ? `Hmm, sun liya. ${prepared}`
-      : `Hmph, okay fine. ${prepared}`;
-  }
-  if (mood === "cry") {
-    return isHindi
-      ? `Aww, dil bhar aaya. ${prepared}`
-      : `Aww, sniffle. ${prepared}`;
-  }
-  if (mood === "emotional") {
-    return isHindi
-      ? `Aww, sach mein? ${prepared}`
-      : `Aww, softly. ${prepared}`;
-  }
-  if (mood === "calm") {
-    return isHindi
-      ? `Aaram se suno. ${prepared}`
-      : `Take a soft breath. ${prepared}`;
-  }
-  return isHindi ? `Hmm! ${prepared}` : `Mmm! ${prepared}`;
-}
-
-export default function ParvatiAIPage() {
   const [visitorName, setVisitorName] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [editingName, setEditingName] = useState(false);
@@ -183,8 +163,46 @@ export default function ParvatiAIPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognizerLike | null>(null);
   const holdingRef = useRef(false);
+  const speakSessionRef = useRef(0);
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(UNLOCK_SESSION_KEY) === "1") {
+        setUnlocked(true);
+      }
+    } catch {
+      // Ignored
+    }
+  }, []);
+
+  const handleUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwdInput.trim() === AI_ACCESS_PWD) {
+      setUnlocked(true);
+      setPwdError("");
+      setPwdInput("");
+      try {
+        sessionStorage.setItem(UNLOCK_SESSION_KEY, "1");
+      } catch {
+        // Ignored
+      }
+    } else {
+      setPwdError("Incorrect password. Please try again.");
+    }
+  };
+
+  const handleLock = () => {
+    stopSpeaking();
+    setUnlocked(false);
+    try {
+      sessionStorage.removeItem(UNLOCK_SESSION_KEY);
+    } catch {
+      // Ignored
+    }
+  };
 
   const stopSpeaking = useCallback(() => {
+    speakSessionRef.current += 1;
     setSpeakingMessageId(null);
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       try {
@@ -195,7 +213,10 @@ export default function ParvatiAIPage() {
     }
   }, []);
 
-  // Single continuous utterance per click so commas/periods never cause long dead pauses
+  /**
+   * Speaks each word clearly with human-like expression & per-word Hindi/English voice tuning
+   * and zero long punctuation pauses.
+   */
   const speakMessage = useCallback(
     (messageId: string, rawText: string) => {
       if (speakingMessageId === messageId) {
@@ -210,12 +231,14 @@ export default function ParvatiAIPage() {
       const stripped = sanitizeForSpeech(rawText);
       if (!stripped) return;
 
-      const isHindi = hasHindiScriptOrWords(stripped);
+      const words = stripped.split(/\s+/).filter(Boolean);
+      if (words.length === 0) return;
+
       const mood = detectEmotionMood(stripped);
       setActiveMood(mood);
 
-      const spokenText = buildSmoothSpokenText(stripped, mood, isHindi);
-      if (!spokenText) return;
+      const sessionId = speakSessionRef.current + 1;
+      speakSessionRef.current = sessionId;
 
       try {
         window.speechSynthesis.cancel();
@@ -224,76 +247,105 @@ export default function ParvatiAIPage() {
       }
 
       const voices = window.speechSynthesis.getVoices();
-      let chosenVoice: SpeechSynthesisVoice | null = null;
+      const hindiVoice =
+        voices.find((v) => v.lang.toLowerCase().startsWith("hi")) ||
+        voices.find((v) => /india|hindi|heera|swara|neerja/i.test(v.name)) ||
+        null;
 
-      if (isHindi) {
-        chosenVoice =
-          voices.find((v) => v.lang.toLowerCase().startsWith("hi")) ||
-          voices.find((v) =>
-            /india|hindi|heera|swara|neerja/i.test(v.name)
-          ) ||
-          null;
-      } else {
-        chosenVoice =
-          voices.find(
-            (v) =>
-              /en-IN/i.test(v.lang) &&
-              /female|girl|heera|neerja|priya|aditi|rhea/i.test(v.name)
-          ) ||
-          voices.find((v) =>
-            /female|zira|aria|samantha|heera|veena|google uk english female|google us english/i.test(
-              v.name
-            )
-          ) ||
-          voices.find((v) => v.lang.toLowerCase().startsWith("en")) ||
-          null;
-      }
+      const englishVoice =
+        voices.find(
+          (v) =>
+            /en-IN/i.test(v.lang) &&
+            /female|girl|heera|neerja|priya|aditi|rhea/i.test(v.name)
+        ) ||
+        voices.find((v) =>
+          /female|zira|aria|samantha|heera|veena|google uk english female|google us english/i.test(
+            v.name
+          )
+        ) ||
+        voices.find((v) => v.lang.toLowerCase().startsWith("en")) ||
+        null;
 
-      const utterance = new SpeechSynthesisUtterance(spokenText);
-      utterance.lang = isHindi
-        ? chosenVoice?.lang || "hi-IN"
-        : chosenVoice?.lang || "en-IN";
-      if (chosenVoice) {
-        utterance.voice = chosenVoice;
-      }
+      let basePitch = 1.32;
+      let baseRate = 1.04;
+      let baseVolume = 0.88;
 
-      // Soft baby-girl tone with natural flow (no slow drag after punctuation)
       if (mood === "laugh") {
-        utterance.pitch = 1.38;
-        utterance.rate = 1.08;
-        utterance.volume = 0.9;
+        basePitch = 1.4;
+        baseRate = 1.1;
+        baseVolume = 0.94;
       } else if (mood === "attitude") {
-        utterance.pitch = 1.34;
-        utterance.rate = 1.04;
-        utterance.volume = 0.88;
+        basePitch = 1.35;
+        baseRate = 1.06;
+        baseVolume = 0.9;
       } else if (mood === "cry") {
-        utterance.pitch = 1.28;
-        utterance.rate = 0.92;
-        utterance.volume = 0.82;
+        basePitch = 1.24;
+        baseRate = 0.94;
+        baseVolume = 0.82;
       } else if (mood === "emotional") {
-        utterance.pitch = 1.35;
-        utterance.rate = 0.98;
-        utterance.volume = 0.86;
+        basePitch = 1.34;
+        baseRate = 1.0;
+        baseVolume = 0.88;
       } else if (mood === "calm") {
-        utterance.pitch = 1.26;
-        utterance.rate = 0.95;
-        utterance.volume = 0.82;
-      } else {
-        utterance.pitch = 1.35;
-        utterance.rate = 1.02;
-        utterance.volume = 0.86;
+        basePitch = 1.22;
+        baseRate = 0.98;
+        baseVolume = 0.82;
       }
-
-      utterance.onstart = () => setSpeakingMessageId(messageId);
-      utterance.onend = () => setSpeakingMessageId(null);
-      utterance.onerror = () => setSpeakingMessageId(null);
 
       setSpeakingMessageId(messageId);
-      try {
-        window.speechSynthesis.speak(utterance);
-      } catch {
-        setSpeakingMessageId(null);
-      }
+
+      const speakWordAt = (idx: number) => {
+        if (speakSessionRef.current !== sessionId) return;
+        if (idx >= words.length) {
+          setSpeakingMessageId(null);
+          return;
+        }
+
+        const rawWord = words[idx];
+        const wordIsHindi = isHindiWord(rawWord);
+        const spokenWord = wordIsHindi
+          ? clarifyWordPhonetics(rawWord)
+          : rawWord.replace(/[^\w'-]/g, "") || rawWord;
+
+        // Subtle expressive pitch/rate wave on every word
+        const wave = Math.sin(idx * 0.85) * 0.06;
+        const emphasis =
+          /[!?]/.test(rawWord) || rawWord.length > 6 ? 0.05 : 0;
+
+        const utterance = new SpeechSynthesisUtterance(spokenWord);
+        if (wordIsHindi) {
+          utterance.lang = hindiVoice?.lang || "hi-IN";
+          if (hindiVoice) utterance.voice = hindiVoice;
+        } else {
+          utterance.lang = englishVoice?.lang || "en-IN";
+          if (englishVoice) utterance.voice = englishVoice;
+        }
+
+        utterance.pitch = Math.min(2, Math.max(0.6, basePitch + wave + emphasis));
+        utterance.rate = Math.min(1.6, Math.max(0.75, baseRate + wave * 0.5));
+        utterance.volume = baseVolume;
+
+        utterance.onend = () => {
+          if (speakSessionRef.current !== sessionId) return;
+          // Crisp, quick human word-to-word gap (no slow punctuation drag)
+          const endsSentence = /[.!?।]$/.test(rawWord);
+          const pauseMs = endsSentence ? 55 : 20;
+          setTimeout(() => speakWordAt(idx + 1), pauseMs);
+        };
+
+        utterance.onerror = () => {
+          if (speakSessionRef.current !== sessionId) return;
+          speakWordAt(idx + 1);
+        };
+
+        try {
+          window.speechSynthesis.speak(utterance);
+        } catch {
+          setSpeakingMessageId(null);
+        }
+      };
+
+      speakWordAt(0);
     },
     [speakingMessageId, stopSpeaking]
   );
@@ -317,7 +369,6 @@ export default function ParvatiAIPage() {
       setInput("");
       setLoading(true);
 
-      // Filter out any prior assistant messages that repeatedly mention Free Fire unless user asked
       const askedAboutGame = /\b(free fire|ff|game|gaming|headshot)\b/i.test(text);
       const filteredHistory = askedAboutGame
         ? nextMessages
@@ -340,7 +391,7 @@ export default function ParvatiAIPage() {
           body: JSON.stringify({
             visitorName,
             styleHint:
-              "Be funny, cute, expressive with emojis, and have a tiny playful attitude. Do not bring up Free Fire unless the user asks about games.",
+              "Be funny, cute, expressive with emojis, and have a tiny playful attitude. Do not bring up Free Fire unless asked.",
             messages: filteredHistory.map((m) => ({
               role: m.role,
               content: m.content,
@@ -397,8 +448,8 @@ export default function ParvatiAIPage() {
         id: "welcome",
         role: "assistant",
         content: saved
-          ? `Ohhh, look who's here—${saved}! 😏✨ Sweetie is smiling, cute, and has just a tiny bit of attitude today 🌸 Tap Speak on any reply if you wanna hear my soft voice!`
-          : "Heyyy cutie! 😏🌸 I'm Sweetie—funny, expressive, and a little sassy. Replies stay text-only until you tap Speak on a message! ✨💅",
+          ? `Heyyy ${saved}! 😏🌸 Sweetie is here with cute attitude & clear Hindi/English voice. Tap Speak on any reply whenever you want to hear me!`
+          : "Heyyy cutie! 😏🌸 I'm Sweetie—funny, expressive, and a little sassy. Replies appear in text first; tap Speak on any message to hear every word clearly!",
         time: getTimeNow(),
       },
     ]);
@@ -453,7 +504,7 @@ export default function ParvatiAIPage() {
 
     try {
       const recognition = new SpeechRec();
-      recognition.lang = hasHindiScriptOrWords(input) ? "hi-IN" : "en-IN";
+      recognition.lang = hasHindiText(input) ? "hi-IN" : "en-IN";
       recognition.interimResults = true;
       recognition.maxAlternatives = 1;
       recognition.continuous = true;
@@ -546,6 +597,63 @@ export default function ParvatiAIPage() {
     ]);
   };
 
+  // Password Gate Screen
+  if (!unlocked) {
+    return (
+      <div className="max-w-md mx-auto py-12 animate-fade-up">
+        <form
+          onSubmit={handleUnlock}
+          className="p-7 rounded-3xl bg-white/95 border border-rose-200 shadow-xl space-y-5 text-center"
+        >
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md">
+            <Lock size={26} />
+          </div>
+
+          <div className="space-y-1">
+            <h1 className="text-2xl font-heading font-bold text-slate-900">
+              Sweetie🌸 AI Protected
+            </h1>
+            <p className="text-xs text-slate-600">
+              Enter access password to open Sweetie🌸 chat.
+            </p>
+          </div>
+
+          <div className="relative">
+            <KeyRound
+              size={16}
+              className="text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
+            />
+            <input
+              type="password"
+              inputMode="numeric"
+              autoFocus
+              value={pwdInput}
+              onChange={(e) => {
+                setPwdInput(e.target.value);
+                if (pwdError) setPwdError("");
+              }}
+              placeholder="Enter password..."
+              className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
+            />
+          </div>
+
+          {pwdError && (
+            <p className="text-xs font-mono font-bold text-rose-600">
+              {pwdError}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md hover:scale-[1.02] transition-all cursor-pointer"
+          >
+            <Unlock size={15} /> Unlock Sweetie🌸
+          </button>
+        </form>
+      </div>
+    );
+  }
+
   const speakingNow = speakingMessageId !== null;
   const isChatAnimated = holdingMic || speakingNow;
 
@@ -566,7 +674,7 @@ export default function ParvatiAIPage() {
               Sweetie🌸
             </h1>
             <p className="text-xs text-slate-600">
-              Soft baby voice • Vibe:{" "}
+              Clear Hindi/English voice • Vibe:{" "}
               <span className="font-mono font-bold text-rose-600">
                 {speakingNow ? `${activeMood} (speaking)` : activeMood}
               </span>
@@ -610,6 +718,15 @@ export default function ParvatiAIPage() {
           >
             <Trash2 size={13} /> Clear
           </button>
+
+          <button
+            type="button"
+            onClick={handleLock}
+            title="Lock AI"
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 hover:bg-rose-600 text-white text-xs font-mono font-bold transition-colors cursor-pointer"
+          >
+            <Lock size={12} /> Lock
+          </button>
         </div>
       </div>
 
@@ -630,7 +747,7 @@ export default function ParvatiAIPage() {
 
         {!holdingMic && speakingNow && (
           <div className="px-4 py-2 bg-gradient-to-r from-pink-500 via-rose-400 to-amber-400 text-white text-xs font-mono font-bold flex items-center justify-between animate-pulse">
-            <span>Sweetie is talking softly ({activeMood})...</span>
+            <span>Sweetie is speaking every word ({activeMood})...</span>
             <button
               type="button"
               onClick={stopSpeaking}
