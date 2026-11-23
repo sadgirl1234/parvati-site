@@ -13,7 +13,6 @@ import {
   Square,
   Cog,
   LogOut,
-  Sparkles,
   Phone,
   ShieldCheck,
 } from "lucide-react";
@@ -92,6 +91,35 @@ const THINKING_PHRASES = [
   "Sweetie is cooking up a funny comeback... 😏💅",
   "Give me a sec, making it extra cute... 🌸😌",
 ];
+
+function ColourfulGoogleLogo({ size = 15 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.54-1.14 2.85-2.4 3.72v3.05h3.88c2.27-2.09 3.665-5.17 3.665-8.26z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96z"
+      />
+    </svg>
+  );
+}
 
 function getTimeNow() {
   return new Intl.DateTimeFormat("en-IN", {
@@ -278,7 +306,7 @@ async function storeUserQuestionRecord(params: {
   try {
     await supabase.from("sweetie_user_questions").insert([record]);
   } catch {
-    // Ignored if table isn't created yet
+    // Ignored
   }
 }
 
@@ -287,12 +315,10 @@ export default function SweetieAIPage() {
     null
   );
 
-  // Auth / Account Creation states (Mobile OTP or Google)
   const [authTab, setAuthTab] = useState<"mobile" | "google">("mobile");
   const [phoneInput, setPhoneInput] = useState("");
   const [googleEmailInput, setGoogleEmailInput] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  const [generatedOtp, setGeneratedOtp] = useState("");
   const [otpInput, setOtpInput] = useState("");
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
@@ -319,7 +345,6 @@ export default function SweetieAIPage() {
   const holdingRef = useRef(false);
   const speakSessionRef = useRef(0);
 
-  // Restore saved user account session if already signed in
   useEffect(() => {
     try {
       const savedSession = sessionStorage.getItem(USER_AUTH_KEY);
@@ -334,11 +359,11 @@ export default function SweetieAIPage() {
     }
 
     supabase.auth.getUser().then(({ data }) => {
-      const email = data?.user?.email;
-      if (email) {
+      const user = data?.user;
+      if (user?.email || user?.phone) {
         const sess: ActiveUserSession = {
-          identifier: email,
-          method: "google",
+          identifier: user.email || user.phone || "",
+          method: user.email ? "google" : "mobile-otp",
         };
         setUserSession(sess);
         try {
@@ -350,7 +375,6 @@ export default function SweetieAIPage() {
     });
   }, []);
 
-  // Full-screen petals in front of all content
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -465,87 +489,70 @@ export default function SweetieAIPage() {
     }
   };
 
+  // Real Supabase SMS OTP request (no demo fallback)
   const handleSendMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
     const cleaned = phoneInput.trim();
     if (cleaned.length < 8) {
-      setAuthError("Please enter a valid mobile number.");
+      setAuthError("Please enter a valid mobile number with country code.");
       return;
     }
 
+    const formattedPhone = cleaned.startsWith("+") ? cleaned : `+91${cleaned}`;
     setAuthBusy(true);
     try {
-      const formattedPhone = cleaned.startsWith("+") ? cleaned : `+91${cleaned}`;
       const { error } = await supabase.auth.signInWithOtp({
         phone: formattedPhone,
       });
-
       if (error) {
-        // Fallback 6-digit verification code if SMS provider isn't configured yet
-        const code = String(Math.floor(100000 + Math.random() * 900000));
-        setGeneratedOtp(code);
-        setOtpSent(true);
-        setAuthError(
-          `Demo OTP sent to ${formattedPhone}: ${code} (Configure SMS provider in Supabase for live SMS)`
-        );
-      } else {
-        setGeneratedOtp("");
-        setOtpSent(true);
+        setAuthError(error.message || "Failed to send SMS OTP.");
+        return;
       }
+      setOtpSent(true);
     } catch {
-      setAuthError("Could not send OTP right now. Please try again.");
+      setAuthError("Unable to send SMS OTP. Check Supabase Phone Auth settings.");
     } finally {
       setAuthBusy(false);
     }
   };
 
+  // Real Supabase SMS OTP verification
   const handleVerifyMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
-    const cleanedPhone = phoneInput.trim();
-    const formattedPhone = cleanedPhone.startsWith("+")
-      ? cleanedPhone
-      : `+91${cleanedPhone}`;
+    const cleaned = phoneInput.trim();
+    const formattedPhone = cleaned.startsWith("+") ? cleaned : `+91${cleaned}`;
     const code = otpInput.trim();
 
     if (!code) {
-      setAuthError("Enter the OTP code.");
+      setAuthError("Please enter the OTP received on your phone.");
       return;
     }
 
     setAuthBusy(true);
     try {
-      if (!generatedOtp) {
-        const { data, error } = await supabase.auth.verifyOtp({
-          phone: formattedPhone,
-          token: code,
-          type: "sms",
-        });
-        if (error) {
-          setAuthError(error.message || "Invalid OTP.");
-          return;
-        }
-        completeLogin({
-          identifier: data.user?.phone || formattedPhone,
-          method: "mobile-otp",
-        });
+      const { data, error } = await supabase.auth.verifyOtp({
+        phone: formattedPhone,
+        token: code,
+        type: "sms",
+      });
+      if (error) {
+        setAuthError(error.message || "Invalid OTP code.");
         return;
       }
-
-      if (code === generatedOtp) {
-        completeLogin({
-          identifier: formattedPhone,
-          method: "mobile-otp",
-        });
-      } else {
-        setAuthError("OTP does not match. Check the code and try again.");
-      }
+      completeLogin({
+        identifier: data.user?.phone || formattedPhone,
+        method: "mobile-otp",
+      });
+    } catch {
+      setAuthError("OTP verification failed.");
     } finally {
       setAuthBusy(false);
     }
   };
 
+  // Real Google OAuth or real Supabase Email OTP
   const handleSendGoogleOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -554,7 +561,6 @@ export default function SweetieAIPage() {
     setAuthBusy(true);
     try {
       if (!email) {
-        // Real Google OAuth redirect when no email typed
         const { error } = await supabase.auth.signInWithOAuth({
           provider: "google",
           options: {
@@ -565,9 +571,7 @@ export default function SweetieAIPage() {
           },
         });
         if (error) {
-          setAuthError(
-            "Enter your Google Gmail below to verify via OTP or enable Google OAuth in Supabase."
-          );
+          setAuthError(error.message || "Google sign-in failed.");
         }
         return;
       }
@@ -576,18 +580,19 @@ export default function SweetieAIPage() {
         email,
         options: { shouldCreateUser: true },
       });
-
-      const code = String(Math.floor(100000 + Math.random() * 900000));
-      setGeneratedOtp(error ? code : "");
-      setOtpSent(true);
       if (error) {
-        setAuthError(`Google verification OTP: ${code}`);
+        setAuthError(error.message || "Failed to send Google email OTP.");
+        return;
       }
+      setOtpSent(true);
+    } catch {
+      setAuthError("Could not start Google verification.");
     } finally {
       setAuthBusy(false);
     }
   };
 
+  // Real Supabase Email OTP verification
   const handleVerifyGoogleOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -595,37 +600,27 @@ export default function SweetieAIPage() {
     const code = otpInput.trim();
 
     if (!code) {
-      setAuthError("Enter the OTP code.");
+      setAuthError("Please enter the OTP code.");
       return;
     }
 
     setAuthBusy(true);
     try {
-      if (!generatedOtp) {
-        const { data, error } = await supabase.auth.verifyOtp({
-          email,
-          token: code,
-          type: "email",
-        });
-        if (error) {
-          setAuthError(error.message || "Invalid OTP.");
-          return;
-        }
-        completeLogin({
-          identifier: data.user?.email || email,
-          method: "google",
-        });
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: "email",
+      });
+      if (error) {
+        setAuthError(error.message || "Invalid OTP code.");
         return;
       }
-
-      if (code === generatedOtp) {
-        completeLogin({
-          identifier: email,
-          method: "google",
-        });
-      } else {
-        setAuthError("OTP does not match. Try again.");
-      }
+      completeLogin({
+        identifier: data.user?.email || email,
+        method: "google",
+      });
+    } catch {
+      setAuthError("OTP verification failed.");
     } finally {
       setAuthBusy(false);
     }
@@ -1110,11 +1105,11 @@ export default function SweetieAIPage() {
                   }}
                   className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
                     authTab === "google"
-                      ? "bg-white text-rose-600 shadow-xs"
+                      ? "bg-white text-slate-900 shadow-xs"
                       : "text-slate-600"
                   }`}
                 >
-                  <Sparkles size={13} /> Google OTP
+                  <ColourfulGoogleLogo size={14} /> Google OTP
                 </button>
               </div>
 
@@ -1143,7 +1138,7 @@ export default function SweetieAIPage() {
                       inputMode="numeric"
                       value={otpInput}
                       onChange={(e) => setOtpInput(e.target.value)}
-                      placeholder="Enter 6-digit OTP"
+                      placeholder="Enter OTP sent to your mobile"
                       className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
                     />
                     <button
@@ -1167,13 +1162,16 @@ export default function SweetieAIPage() {
                   <button
                     type="submit"
                     disabled={authBusy}
-                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
+                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
                   >
-                    {authBusy
-                      ? "Processing..."
-                      : googleEmailInput.trim()
-                      ? "Send Google OTP"
-                      : "Continue with Google"}
+                    <ColourfulGoogleLogo size={15} />
+                    <span>
+                      {authBusy
+                        ? "Processing..."
+                        : googleEmailInput.trim()
+                        ? "Send Google OTP"
+                        : "Continue with Google"}
+                    </span>
                   </button>
                 </form>
               ) : (
@@ -1183,7 +1181,7 @@ export default function SweetieAIPage() {
                     inputMode="numeric"
                     value={otpInput}
                     onChange={(e) => setOtpInput(e.target.value)}
-                    placeholder="Enter Google verification OTP"
+                    placeholder="Enter OTP sent to your email"
                     className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
                   />
                   <button
@@ -1215,12 +1213,9 @@ export default function SweetieAIPage() {
                   <Cog size={22} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5">
-                    <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900">
-                      Sweetie🌸
-                    </h1>
-                    <Sparkles size={16} className="text-rose-500" />
-                  </div>
+                  <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900">
+                    Sweetie🌸
+                  </h1>
                   <p className="text-xs text-slate-600">
                     {userSession.identifier} • Mood:{" "}
                     <span className="font-mono font-bold text-rose-600">

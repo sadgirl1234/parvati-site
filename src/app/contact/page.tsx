@@ -1,68 +1,67 @@
 "use client";
 
-import { ExternalLink, Sparkles } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
-const INSTA_HANDLE = "parvatisingh3118";
-const INSTA_DM_URL = `https://ig.me/m/${INSTA_HANDLE}`;
+const INSTAGRAM_DM_URL = "https://ig.me/m/secretsenior1";
 
-function InstagramIcon({ size = 24 }: { size?: number }) {
+function InstagramDirectLogo({ size = 16 }: { size?: number }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0"
     >
-      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+      <defs>
+        <linearGradient id="igDmBadgeGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#F58529" />
+          <stop offset="50%" stopColor="#DD2A7B" />
+          <stop offset="100%" stopColor="#8134AF" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M21.5 3.5L2.8 10.7c-1.1.4-1 2 .1 2.4l4.7 1.6 1.8 5.6c.4 1.1 1.8 1.3 2.5.4l2.7-3.4 4.8 3.5c.9.7 2.2.1 2.4-1l2.7-16.2c.2-1.1-.9-2-2-1.5z"
+        fill="url(#igDmBadgeGrad)"
+      />
+      <path
+        d="M7.6 14.7l11.8-8.9-9.1 10.6"
+        stroke="#FFFFFF"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
 
-export default function ContactPage() {
+export default function InstagramDmCard() {
   return (
-    <div className="max-w-xl mx-auto pt-8 sm:pt-14 animate-fade-up">
-      <div className="relative overflow-hidden rounded-[2rem] p-8 sm:p-10 bg-white/90 backdrop-blur-xl border border-rose-200/80 shadow-[0_20px_50px_rgba(244,63,94,0.12)] text-center space-y-6">
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-rose-500 to-fuchsia-600" />
-
-        <div className="w-16 h-16 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 via-rose-500 to-fuchsia-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/30">
-          <InstagramIcon size={32} />
-        </div>
-
-        <div className="space-y-2">
-          <p className="inline-flex items-center gap-1.5 text-xs font-mono uppercase tracking-widest text-rose-600 font-bold">
-            <Sparkles size={13} /> Direct Message
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-heading font-bold text-slate-900">
-            Message Parvati on Instagram
-          </h1>
-          <p className="text-sm text-slate-600">
-            Want to connect or say hello? Slide straight into my Instagram DM!
-          </p>
-        </div>
-
-        <div className="inline-block px-4 py-1.5 rounded-full bg-rose-50 border border-rose-200 font-mono text-sm font-bold text-rose-700">
-          @{INSTA_HANDLE}
-        </div>
-
-        <div>
-          <a
-            href={INSTA_DM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center justify-center gap-2.5 w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-rose-500 to-fuchsia-600 text-white font-bold text-sm shadow-lg shadow-rose-500/25 hover:scale-105 active:scale-95 transition-all"
-          >
-            <InstagramIcon size={18} />
-            Open Instagram Direct DM
-            <ExternalLink size={15} />
-          </a>
-        </div>
+    <a
+      href={INSTAGRAM_DM_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block p-6 rounded-3xl bg-white/95 border border-rose-200/90 hover:border-pink-400 shadow-sm hover:shadow-xl transition-all space-y-3"
+    >
+      <div className="inline-flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
+        <InstagramDirectLogo size={16} />
+        <span>DIRECT MESSAGE</span>
       </div>
-    </div>
+
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-lg sm:text-xl font-heading font-bold text-slate-900 group-hover:text-rose-600 transition-colors">
+          Message Parvati on Instagram
+        </h3>
+        <ArrowUpRight
+          size={18}
+          className="text-slate-400 group-hover:text-rose-600 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform shrink-0"
+        />
+      </div>
+
+      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+        Want to connect or say hello? Slide straight into Instagram Direct.
+      </p>
+    </a>
   );
 }
