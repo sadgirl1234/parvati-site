@@ -96,9 +96,15 @@ function getTimeNow() {
 }
 
 function sanitizeForSpeech(raw: string): string {
-  const withoutSurrogatePairs = raw.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, " ");
+  const withoutSurrogatePairs = raw.replace(
+    /[\uD800-\uDBFF][\uDC00-\uDFFF]/g,
+    " "
+  );
   const withoutSymbols = withoutSurrogatePairs.replace(/[\u2600-\u27BF]/g, " ");
-  const withoutSelectors = withoutSymbols.replace(/[\uFE00-\uFE0F\u200D]/g, "");
+  const withoutSelectors = withoutSymbols.replace(
+    /[\uFE00-\uFE0F\u200D]/g,
+    ""
+  );
   const withoutEmojiLabels = withoutSelectors.replace(
     /\b(smiling face|blushing|cherry blossom|sparkles|heart|red heart|grinning|laughing|crying|sob|tears|wink|kiss|rolling eyes|eye roll|emoji)\b/gi,
     " "
@@ -138,13 +144,25 @@ function detectEmotionMood(text: string): EmotionMood {
   if (/\b(haha|hehe|lol|joke|funny|laugh|haso|hansi|mazak)\b/i.test(lower)) {
     return "laugh";
   }
-  if (/\b(cry|crying|sad|sorry|hurt|miss|lonely|tear|rona|udas|dukhi)\b/i.test(lower)) {
+  if (
+    /\b(cry|crying|sad|sorry|hurt|miss|lonely|tear|rona|udas|dukhi)\b/i.test(
+      lower
+    )
+  ) {
     return "cry";
   }
-  if (/\b(love|sweet|cute|heart|care|hug|special|emotional|pyaar|dil)\b/i.test(lower)) {
+  if (
+    /\b(love|sweet|cute|heart|care|hug|special|emotional|pyaar|dil)\b/i.test(
+      lower
+    )
+  ) {
     return "emotional";
   }
-  if (/\b(calm|relax|peace|slow|gentle|breathe|aaram|shanti|sleep)\b/i.test(lower)) {
+  if (
+    /\b(calm|relax|peace|slow|gentle|breathe|aaram|shanti|sleep)\b/i.test(
+      lower
+    )
+  ) {
     return "calm";
   }
   if (/\b(attitude|whatever|seriously|huh|sassy|boss|hmph)\b/i.test(lower)) {
@@ -183,6 +201,7 @@ function buildExhalationWordStream(words: string[], mood: EmotionMood): string[]
 }
 
 export default function SweetieAIPage() {
+  // Always start locked on mount unless explicitly unlocked in this session
   const [unlocked, setUnlocked] = useState(false);
   const [pwdInput, setPwdInput] = useState("");
   const [pwdError, setPwdError] = useState("");
@@ -216,16 +235,7 @@ export default function SweetieAIPage() {
   const speakSessionRef = useRef(0);
   const draggingBrushRef = useRef(false);
 
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem(UNLOCK_SESSION_KEY) === "1") {
-        setUnlocked(true);
-      }
-    } catch {
-      // Ignored
-    }
-  }, []);
-
+  // Slow-motion wind-blown continuous petals + bottom pile + manual brush sweeping
   useEffect(() => {
     if (!unlocked) return;
     const canvas = canvasRef.current;
@@ -239,20 +249,20 @@ export default function SweetieAIPage() {
     const createPetal = (startAtTop = true): Petal => ({
       x: Math.random() * width,
       y: startAtTop
-        ? -20 - Math.random() * 140
-        : Math.random() * (height - 40),
-      vx: (Math.random() - 0.5) * 1.4,
-      vy: 2.2 + Math.random() * 2.8,
+        ? -24 - Math.random() * 180
+        : Math.random() * (height - 50),
+      vx: (Math.random() - 0.5) * 0.8,
+      vy: 0.55 + Math.random() * 0.75, // Gentle slow-motion fall speed
       size: 7 + Math.random() * 7,
       rotation: Math.random() * Math.PI * 2,
-      vRot: (Math.random() - 0.5) * 0.08,
+      vRot: (Math.random() - 0.5) * 0.035,
       swayPhase: Math.random() * Math.PI * 2,
-      swaySpeed: 0.03 + Math.random() * 0.03,
+      swaySpeed: 0.018 + Math.random() * 0.018,
       color: PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)],
       settled: false,
     });
 
-    petalsRef.current = Array.from({ length: 140 }, () => createPetal(false));
+    petalsRef.current = Array.from({ length: 150 }, () => createPetal(false));
 
     const handleResize = () => {
       if (!canvas) return;
@@ -262,34 +272,53 @@ export default function SweetieAIPage() {
     window.addEventListener("resize", handleResize, { passive: true });
 
     let animId = 0;
-    const gravityAccel = 0.065;
-    const maxPileHeight = 135;
+    let windTick = 0;
+    const maxPileHeight = 140;
 
     const tick = () => {
+      windTick += 0.008;
+      // Blowing wind oscillates smoothly left and right with gentle gusts
+      const windForce = Math.sin(windTick) * 1.45 + Math.cos(windTick * 2.3) * 0.55;
+
       ctx.clearRect(0, 0, width, height);
 
-      if (petalsRef.current.length < 360 && Math.random() < 0.72) {
+      // Non-stop continuous emission of fresh falling petals
+      for (let i = 0; i < 2; i++) {
         petalsRef.current.push(createPetal(true));
       }
 
-      const activePetals: Petal[] = [];
+      // Keep settled pile bounded cleanly so frame rate stays silky while emission is non-stop
+      if (petalsRef.current.length > 900) {
+        petalsRef.current.splice(0, petalsRef.current.length - 900);
+      }
+
+      const nextPetals: Petal[] = [];
 
       for (const p of petalsRef.current) {
         if (!p.settled) {
           p.swayPhase += p.swaySpeed;
-          p.vy = Math.min(7.5, p.vy + gravityAccel);
-          p.x += Math.sin(p.swayPhase) * 1.35 + p.vx * 0.35;
+          // Slow-motion terminal drift with blowing wind
+          const targetFallSpeed = 0.65 + (p.size % 5) * 0.14;
+          p.vy += (targetFallSpeed - p.vy) * 0.04;
+          p.x +=
+            windForce +
+            Math.sin(p.swayPhase) * 1.15 +
+            p.vx * 0.25;
           p.y += p.vy;
-          p.rotation += p.vRot;
+          p.rotation += p.vRot + windForce * 0.012;
 
-          if (p.x < 10) p.x = 10;
-          if (p.x > width - 10) p.x = width - 10;
+          // Wrap horizontally across viewport edges as wind blows
+          if (p.x < -20) p.x = width + 15;
+          if (p.x > width + 20) p.x = -15;
 
-          const pileJitter = ((Math.sin(p.x * 0.04) + 1) * 0.5) * maxPileHeight;
+          const clampedX = Math.max(10, Math.min(width - 10, p.x));
+          const pileJitter =
+            ((Math.sin(clampedX * 0.035) + 1) * 0.5) * maxPileHeight;
           const floorY = height - 10 - pileJitter;
 
           if (p.y >= floorY) {
             p.y = floorY;
+            p.x = clampedX;
             p.vy = 0;
             p.vx = 0;
             p.vRot = 0;
@@ -301,16 +330,16 @@ export default function SweetieAIPage() {
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
         ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.settled ? 0.92 : 0.85;
+        ctx.globalAlpha = p.settled ? 0.92 : 0.86;
         ctx.beginPath();
         ctx.ellipse(0, 0, p.size * 0.65, p.size * 0.36, 0, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
 
-        activePetals.push(p);
+        nextPetals.push(p);
       }
 
-      petalsRef.current = activePetals;
+      petalsRef.current = nextPetals;
       animId = window.requestAnimationFrame(tick);
     };
 
@@ -323,7 +352,7 @@ export default function SweetieAIPage() {
   }, [unlocked]);
 
   const sweepPetalsAt = useCallback((clientX: number, clientY: number) => {
-    const brushRadius = 68;
+    const brushRadius = 72;
     let clearedNow = 0;
 
     petalsRef.current = petalsRef.current.filter((p) => {
@@ -560,7 +589,9 @@ export default function SweetieAIPage() {
       setInput("");
       setLoading(true);
 
-      const askedAboutGame = /\b(free fire|ff|game|gaming|headshot)\b/i.test(text);
+      const askedAboutGame = /\b(free fire|ff|game|gaming|headshot)\b/i.test(
+        text
+      );
       const filteredHistory = askedAboutGame
         ? nextMessages
         : nextMessages.map((m) =>
@@ -592,7 +623,8 @@ export default function SweetieAIPage() {
 
         const data = (await res.json()) as { reply?: string; error?: string };
         const replyText = res.ok
-          ? data.reply ?? "Hmph, my cute brain blinked for a second! Ask me again 🙄🌸"
+          ? data.reply ??
+            "Hmph, my cute brain blinked for a second! Ask me again 🙄🌸"
           : `⚠️ ${data.error ?? "Failed to reply."}`;
 
         setMessages((prev) => [
@@ -882,7 +914,7 @@ export default function SweetieAIPage() {
               <Sparkles size={16} className="text-rose-500" />
             </div>
             <p className="text-xs text-slate-600">
-              Soft baby voice + exhale • Mood:{" "}
+              Slow wind petals + baby voice • Mood:{" "}
               <span className="font-mono font-bold text-rose-600">
                 {speakingNow ? `${activeMood} (speaking)` : activeMood}
               </span>
