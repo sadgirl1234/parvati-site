@@ -373,6 +373,28 @@ export default function SweetieAIPage() {
         }
       }
     });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user;
+      if (user?.email || user?.phone) {
+        const sess: ActiveUserSession = {
+          identifier: user.email || user.phone || "",
+          method: user.email ? "google" : "mobile-otp",
+        };
+        setUserSession(sess);
+        setOtpSent(false);
+        setAuthError("");
+        try {
+          sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
+        } catch {
+          // Ignored
+        }
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -489,7 +511,6 @@ export default function SweetieAIPage() {
     }
   };
 
-  // Real Supabase SMS OTP request (no demo fallback)
   const handleSendMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -517,7 +538,6 @@ export default function SweetieAIPage() {
     }
   };
 
-  // Real Supabase SMS OTP verification
   const handleVerifyMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -552,7 +572,6 @@ export default function SweetieAIPage() {
     }
   };
 
-  // Real Google OAuth or real Supabase Email OTP
   const handleSendGoogleOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -581,18 +600,17 @@ export default function SweetieAIPage() {
         options: { shouldCreateUser: true },
       });
       if (error) {
-        setAuthError(error.message || "Failed to send Google email OTP.");
+        setAuthError(error.message || "Failed to send OTP email.");
         return;
       }
       setOtpSent(true);
     } catch {
-      setAuthError("Could not start Google verification.");
+      setAuthError("Could not start verification.");
     } finally {
       setAuthBusy(false);
     }
   };
 
-  // Real Supabase Email OTP verification
   const handleVerifyGoogleOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError("");
@@ -600,7 +618,7 @@ export default function SweetieAIPage() {
     const code = otpInput.trim();
 
     if (!code) {
-      setAuthError("Please enter the OTP code.");
+      setAuthError("Please enter the 6-digit OTP code.");
       return;
     }
 
@@ -1120,7 +1138,7 @@ export default function SweetieAIPage() {
                       type="tel"
                       value={phoneInput}
                       onChange={(e) => setPhoneInput(e.target.value)}
-                      placeholder="Enter mobile number (e.g. 9876543210)"
+                      placeholder="Enter mobile number (e.g. +919876543210)"
                       className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
                     />
                     <button
@@ -1181,7 +1199,7 @@ export default function SweetieAIPage() {
                     inputMode="numeric"
                     value={otpInput}
                     onChange={(e) => setOtpInput(e.target.value)}
-                    placeholder="Enter OTP sent to your email"
+                    placeholder="Enter 6-digit OTP sent to your email"
                     className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
                   />
                   <button
