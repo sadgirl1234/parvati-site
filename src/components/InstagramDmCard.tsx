@@ -2,7 +2,7 @@
 
 import { ArrowUpRight } from "lucide-react";
 
-const INSTAGRAM_DM_URL = "https://ig.me/m/secretsenior1";
+const INSTAGRAM_DM_URL = "https://ig.me/m/parvatisingh3118";
 
 function InstagramDirectLogo({ size = 16 }: { size?: number }) {
   return (
@@ -60,7 +60,11 @@ export default function InstagramDmCard() {
       </div>
 
       <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-        Want to connect or say hello? Slide straight into Instagram Direct.
+        Want to connect or say hello? Slide straight into{" "}
+        <span className="font-mono font-semibold text-rose-600">
+          @parvatisingh3118
+        </span>{" "}
+        on Instagram Direct.
       </p>
     </a>
   );
