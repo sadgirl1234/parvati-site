@@ -64,7 +64,8 @@ interface Petal {
   vRot: number;
   swayPhase: number;
   swaySpeed: number;
-  color: string;
+  baseColor: string;
+  highlightColor: string;
   settled: boolean;
 }
 
@@ -72,13 +73,12 @@ const AI_ACCESS_PWD = "841694";
 const UNLOCK_SESSION_KEY = "sweetie_ai_unlocked_v1";
 const NAME_KEY = "sweetie_visitor_name";
 
-const PETAL_COLORS = [
-  "#fb7185",
-  "#f43f5e",
-  "#fda4af",
-  "#f472b6",
-  "#f9a8d4",
-  "#fecdd3",
+const PETAL_PALETTE = [
+  { base: "#e11d48", highlight: "#fda4af" }, // Deep rose + soft blush
+  { base: "#db2777", highlight: "#f9a8d4" }, // Rich magenta + pink
+  { base: "#be123c", highlight: "#fecdd3" }, // Velvet crimson + rose mist
+  { base: "#f43f5e", highlight: "#ffe4e6" }, // Vibrant coral-rose + pearl pink
+  { base: "#c026d3", highlight: "#f5d0fe" }, // Orchid berry + soft petal pink
 ];
 
 const THINKING_PHRASES = [
@@ -200,8 +200,71 @@ function buildExhalationWordStream(words: string[], mood: EmotionMood): string[]
   return out;
 }
 
+function drawRealisticPetal(
+  ctx: CanvasRenderingContext2D,
+  p: Petal,
+  width: number
+) {
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.rotation);
+
+  // Realistic soft shadow on the petal
+  ctx.shadowColor = "rgba(136, 19, 55, 0.28)";
+  ctx.shadowBlur = p.settled ? 5 : 9;
+  ctx.shadowOffsetX = p.settled ? 1 : 2;
+  ctx.shadowOffsetY = p.settled ? 2 : 5;
+
+  const r = p.size;
+  const grad = ctx.createLinearGradient(-r, -r * 0.6, r, r * 0.6);
+  grad.addColorStop(0, p.highlightColor);
+  grad.addColorStop(0.45, p.baseColor);
+  grad.addColorStop(1, "#881337");
+
+  ctx.fillStyle = grad;
+  ctx.globalAlpha = p.settled ? 0.94 : 0.9;
+
+  // Teardrop / organic flower petal silhouette
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.85, 0);
+  ctx.bezierCurveTo(
+    -r * 0.55,
+    -r * 0.72,
+    r * 0.45,
+    -r * 0.68,
+    r * 0.95,
+    0
+  );
+  ctx.bezierCurveTo(
+    r * 0.45,
+    r * 0.68,
+    -r * 0.55,
+    r * 0.72,
+    -r * 0.85,
+    0
+  );
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle central petal vein without extra shadow blur
+  ctx.shadowColor = "transparent";
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.65, 0);
+  ctx.quadraticCurveTo(0, -r * 0.08, r * 0.65, 0);
+  ctx.stroke();
+
+  // Keep subtle bottom edge shadow grounded along the screen base
+  if (p.settled && width > 0) {
+    ctx.fillStyle = "rgba(190, 18, 60, 0.14)";
+    ctx.fillRect(-r * 0.6, r * 0.45, r * 1.2, 2);
+  }
+
+  ctx.restore();
+}
+
 export default function SweetieAIPage() {
-  // Always start locked on mount unless explicitly unlocked in this session
   const [unlocked, setUnlocked] = useState(false);
   const [pwdInput, setPwdInput] = useState("");
   const [pwdError, setPwdError] = useState("");
@@ -235,7 +298,7 @@ export default function SweetieAIPage() {
   const speakSessionRef = useRef(0);
   const draggingBrushRef = useRef(false);
 
-  // Slow-motion wind-blown continuous petals + bottom pile + manual brush sweeping
+  // Full-screen slow-motion wind-blown petals (5x slower fall + lower quantity + shadow & rich palette)
   useEffect(() => {
     if (!unlocked) return;
     const canvas = canvasRef.current;
@@ -246,23 +309,29 @@ export default function SweetieAIPage() {
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
 
-    const createPetal = (startAtTop = true): Petal => ({
-      x: Math.random() * width,
-      y: startAtTop
-        ? -24 - Math.random() * 180
-        : Math.random() * (height - 50),
-      vx: (Math.random() - 0.5) * 0.8,
-      vy: 0.55 + Math.random() * 0.75, // Gentle slow-motion fall speed
-      size: 7 + Math.random() * 7,
-      rotation: Math.random() * Math.PI * 2,
-      vRot: (Math.random() - 0.5) * 0.035,
-      swayPhase: Math.random() * Math.PI * 2,
-      swaySpeed: 0.018 + Math.random() * 0.018,
-      color: PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)],
-      settled: false,
-    });
+    const createPetal = (startAtTop = true): Petal => {
+      const pair =
+        PETAL_PALETTE[Math.floor(Math.random() * PETAL_PALETTE.length)];
+      return {
+        x: Math.random() * width,
+        y: startAtTop
+          ? -24 - Math.random() * 140
+          : Math.random() * (height - 45),
+        vx: (Math.random() - 0.5) * 0.45,
+        vy: 0.11 + Math.random() * 0.13, // ~5x slower than previous fall speed
+        size: 9 + Math.random() * 6,
+        rotation: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.012,
+        swayPhase: Math.random() * Math.PI * 2,
+        swaySpeed: 0.014 + Math.random() * 0.012,
+        baseColor: pair.base,
+        highlightColor: pair.highlight,
+        settled: false,
+      };
+    };
 
-    petalsRef.current = Array.from({ length: 150 }, () => createPetal(false));
+    // Lower, balanced full-screen petal count
+    petalsRef.current = Array.from({ length: 55 }, () => createPetal(false));
 
     const handleResize = () => {
       if (!canvas) return;
@@ -273,23 +342,21 @@ export default function SweetieAIPage() {
 
     let animId = 0;
     let windTick = 0;
-    const maxPileHeight = 140;
+    let spawnAccumulator = 0;
+    const maxPileHeight = 95;
 
     const tick = () => {
-      windTick += 0.008;
-      // Blowing wind oscillates smoothly left and right with gentle gusts
-      const windForce = Math.sin(windTick) * 1.45 + Math.cos(windTick * 2.3) * 0.55;
+      windTick += 0.006;
+      const windForce =
+        Math.sin(windTick) * 0.9 + Math.cos(windTick * 2.1) * 0.35;
 
       ctx.clearRect(0, 0, width, height);
 
-      // Non-stop continuous emission of fresh falling petals
-      for (let i = 0; i < 2; i++) {
+      // Gentle continuous emission across the full width
+      spawnAccumulator += 0.35;
+      while (spawnAccumulator >= 1 && petalsRef.current.length < 165) {
         petalsRef.current.push(createPetal(true));
-      }
-
-      // Keep settled pile bounded cleanly so frame rate stays silky while emission is non-stop
-      if (petalsRef.current.length > 900) {
-        petalsRef.current.splice(0, petalsRef.current.length - 900);
+        spawnAccumulator -= 1;
       }
 
       const nextPetals: Petal[] = [];
@@ -297,23 +364,18 @@ export default function SweetieAIPage() {
       for (const p of petalsRef.current) {
         if (!p.settled) {
           p.swayPhase += p.swaySpeed;
-          // Slow-motion terminal drift with blowing wind
-          const targetFallSpeed = 0.65 + (p.size % 5) * 0.14;
-          p.vy += (targetFallSpeed - p.vy) * 0.04;
-          p.x +=
-            windForce +
-            Math.sin(p.swayPhase) * 1.15 +
-            p.vx * 0.25;
+          const targetFallSpeed = 0.12 + (p.size % 4) * 0.018;
+          p.vy += (targetFallSpeed - p.vy) * 0.05;
+          p.x += windForce + Math.sin(p.swayPhase) * 0.75 + p.vx * 0.2;
           p.y += p.vy;
-          p.rotation += p.vRot + windForce * 0.012;
+          p.rotation += p.vRot + windForce * 0.005;
 
-          // Wrap horizontally across viewport edges as wind blows
-          if (p.x < -20) p.x = width + 15;
-          if (p.x > width + 20) p.x = -15;
+          if (p.x < -24) p.x = width + 20;
+          if (p.x > width + 24) p.x = -20;
 
-          const clampedX = Math.max(10, Math.min(width - 10, p.x));
+          const clampedX = Math.max(12, Math.min(width - 12, p.x));
           const pileJitter =
-            ((Math.sin(clampedX * 0.035) + 1) * 0.5) * maxPileHeight;
+            ((Math.sin(clampedX * 0.03) + 1) * 0.5) * maxPileHeight;
           const floorY = height - 10 - pileJitter;
 
           if (p.y >= floorY) {
@@ -326,16 +388,7 @@ export default function SweetieAIPage() {
           }
         }
 
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = p.settled ? 0.92 : 0.86;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, p.size * 0.65, p.size * 0.36, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-
+        drawRealisticPetal(ctx, p, width);
         nextPetals.push(p);
       }
 
@@ -884,7 +937,7 @@ export default function SweetieAIPage() {
       <canvas
         ref={canvasRef}
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 z-20"
+        className="pointer-events-none fixed left-0 top-0 w-screen h-screen z-20"
       />
 
       {draggingBrush && brushPos && (
@@ -914,7 +967,7 @@ export default function SweetieAIPage() {
               <Sparkles size={16} className="text-rose-500" />
             </div>
             <p className="text-xs text-slate-600">
-              Slow wind petals + baby voice • Mood:{" "}
+              5x slow wind petals + baby voice • Mood:{" "}
               <span className="font-mono font-bold text-rose-600">
                 {speakingNow ? `${activeMood} (speaking)` : activeMood}
               </span>
