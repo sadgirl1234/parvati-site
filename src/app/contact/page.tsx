@@ -2,7 +2,7 @@
 
 import { ArrowUpRight } from "lucide-react";
 
-const INSTAGRAM_DM_URL = "https://ig.me/m/secretsenior1";
+const INSTAGRAM_DM_URL = "https://ig.me/m/parvatisingh3118";
 
 function InstagramDirectLogo({ size = 16 }: { size?: number }) {
   return (
