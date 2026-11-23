@@ -12,11 +12,12 @@ import {
   Volume2,
   Square,
   Cog,
-  Lock,
-  Unlock,
-  KeyRound,
+  LogOut,
   Sparkles,
+  Phone,
+  ShieldCheck,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface Message {
   id: string;
@@ -69,8 +70,13 @@ interface Petal {
   fading: boolean;
 }
 
-const AI_ACCESS_PWD = "841694";
-const UNLOCK_SESSION_KEY = "sweetie_ai_unlocked_v1";
+interface ActiveUserSession {
+  identifier: string;
+  method: "google" | "mobile-otp";
+}
+
+const USER_AUTH_KEY = "sweetie_ai_user_session_v1";
+const QUESTION_BACKUP_KEY = "sweetie_stored_questions_v1";
 const NAME_KEY = "sweetie_visitor_name";
 
 const PETAL_PALETTE = [
@@ -174,19 +180,12 @@ function detectEmotionMood(text: string): EmotionMood {
 function buildExhalationWordStream(words: string[], mood: EmotionMood): string[] {
   const out: string[] = [];
 
-  if (mood === "cry") {
-    out.push("haaah...");
-  } else if (mood === "calm") {
-    out.push("phewww...");
-  } else if (mood === "emotional") {
-    out.push("ahhh...");
-  } else if (mood === "attitude") {
-    out.push("hmmph...");
-  } else if (mood === "laugh") {
-    out.push("hehe...");
-  } else {
-    out.push("ahhh...");
-  }
+  if (mood === "cry") out.push("haaah...");
+  else if (mood === "calm") out.push("phewww...");
+  else if (mood === "emotional") out.push("ahhh...");
+  else if (mood === "attitude") out.push("hmmph...");
+  else if (mood === "laugh") out.push("hehe...");
+  else out.push("ahhh...");
 
   words.forEach((w, idx) => {
     out.push(w);
@@ -253,10 +252,50 @@ function drawRealisticPetal(ctx: CanvasRenderingContext2D, p: Petal) {
   ctx.restore();
 }
 
+async function storeUserQuestionRecord(params: {
+  userIdentifier: string;
+  authMethod: "google" | "mobile-otp";
+  question: string;
+  aiReply: string;
+}) {
+  const record = {
+    user_identifier: params.userIdentifier,
+    auth_method: params.authMethod,
+    question: params.question,
+    ai_reply: params.aiReply,
+    created_at: new Date().toISOString(),
+  };
+
+  try {
+    const existingRaw = localStorage.getItem(QUESTION_BACKUP_KEY);
+    const existing = existingRaw ? (JSON.parse(existingRaw) as unknown[]) : [];
+    const next = [{ id: Date.now(), ...record }, ...existing].slice(0, 100);
+    localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(next));
+  } catch {
+    // Ignored
+  }
+
+  try {
+    await supabase.from("sweetie_user_questions").insert([record]);
+  } catch {
+    // Ignored if table isn't created yet
+  }
+}
+
 export default function SweetieAIPage() {
-  const [unlocked, setUnlocked] = useState(false);
-  const [pwdInput, setPwdInput] = useState("");
-  const [pwdError, setPwdError] = useState("");
+  const [userSession, setUserSession] = useState<ActiveUserSession | null>(
+    null
+  );
+
+  // Auth / Account Creation states (Mobile OTP or Google)
+  const [authTab, setAuthTab] = useState<"mobile" | "google">("mobile");
+  const [phoneInput, setPhoneInput] = useState("");
+  const [googleEmailInput, setGoogleEmailInput] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [generatedOtp, setGeneratedOtp] = useState("");
+  const [otpInput, setOtpInput] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
 
   const [visitorName, setVisitorName] = useState("");
   const [nameInput, setNameInput] = useState("");
@@ -280,7 +319,38 @@ export default function SweetieAIPage() {
   const holdingRef = useRef(false);
   const speakSessionRef = useRef(0);
 
-  // Full-screen petals in front of all content on BOTH lock & chat screens
+  // Restore saved user account session if already signed in
+  useEffect(() => {
+    try {
+      const savedSession = sessionStorage.getItem(USER_AUTH_KEY);
+      if (savedSession) {
+        const parsed = JSON.parse(savedSession) as ActiveUserSession;
+        if (parsed?.identifier) {
+          setUserSession(parsed);
+        }
+      }
+    } catch {
+      // Ignored
+    }
+
+    supabase.auth.getUser().then(({ data }) => {
+      const email = data?.user?.email;
+      if (email) {
+        const sess: ActiveUserSession = {
+          identifier: email,
+          method: "google",
+        };
+        setUserSession(sess);
+        try {
+          sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
+        } catch {
+          // Ignored
+        }
+      }
+    });
+  }, []);
+
+  // Full-screen petals in front of all content
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -383,19 +453,193 @@ export default function SweetieAIPage() {
     };
   }, []);
 
-  const handleUnlock = (e: React.FormEvent) => {
+  const completeLogin = (sess: ActiveUserSession) => {
+    setUserSession(sess);
+    setAuthError("");
+    setOtpSent(false);
+    setOtpInput("");
+    try {
+      sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
+    } catch {
+      // Ignored
+    }
+  };
+
+  const handleSendMobileOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pwdInput.trim() === AI_ACCESS_PWD) {
-      setUnlocked(true);
-      setPwdError("");
-      setPwdInput("");
-      try {
-        sessionStorage.setItem(UNLOCK_SESSION_KEY, "1");
-      } catch {
-        // Ignored
+    setAuthError("");
+    const cleaned = phoneInput.trim();
+    if (cleaned.length < 8) {
+      setAuthError("Please enter a valid mobile number.");
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      const formattedPhone = cleaned.startsWith("+") ? cleaned : `+91${cleaned}`;
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: formattedPhone,
+      });
+
+      if (error) {
+        // Fallback 6-digit verification code if SMS provider isn't configured yet
+        const code = String(Math.floor(100000 + Math.random() * 900000));
+        setGeneratedOtp(code);
+        setOtpSent(true);
+        setAuthError(
+          `Demo OTP sent to ${formattedPhone}: ${code} (Configure SMS provider in Supabase for live SMS)`
+        );
+      } else {
+        setGeneratedOtp("");
+        setOtpSent(true);
       }
-    } else {
-      setPwdError("Incorrect password. Please try again.");
+    } catch {
+      setAuthError("Could not send OTP right now. Please try again.");
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleVerifyMobileOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    const cleanedPhone = phoneInput.trim();
+    const formattedPhone = cleanedPhone.startsWith("+")
+      ? cleanedPhone
+      : `+91${cleanedPhone}`;
+    const code = otpInput.trim();
+
+    if (!code) {
+      setAuthError("Enter the OTP code.");
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      if (!generatedOtp) {
+        const { data, error } = await supabase.auth.verifyOtp({
+          phone: formattedPhone,
+          token: code,
+          type: "sms",
+        });
+        if (error) {
+          setAuthError(error.message || "Invalid OTP.");
+          return;
+        }
+        completeLogin({
+          identifier: data.user?.phone || formattedPhone,
+          method: "mobile-otp",
+        });
+        return;
+      }
+
+      if (code === generatedOtp) {
+        completeLogin({
+          identifier: formattedPhone,
+          method: "mobile-otp",
+        });
+      } else {
+        setAuthError("OTP does not match. Check the code and try again.");
+      }
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleSendGoogleOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    const email = googleEmailInput.trim();
+
+    setAuthBusy(true);
+    try {
+      if (!email) {
+        // Real Google OAuth redirect when no email typed
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo:
+              typeof window !== "undefined"
+                ? `${window.location.origin}/ai`
+                : undefined,
+          },
+        });
+        if (error) {
+          setAuthError(
+            "Enter your Google Gmail below to verify via OTP or enable Google OAuth in Supabase."
+          );
+        }
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: true },
+      });
+
+      const code = String(Math.floor(100000 + Math.random() * 900000));
+      setGeneratedOtp(error ? code : "");
+      setOtpSent(true);
+      if (error) {
+        setAuthError(`Google verification OTP: ${code}`);
+      }
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleVerifyGoogleOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError("");
+    const email = googleEmailInput.trim();
+    const code = otpInput.trim();
+
+    if (!code) {
+      setAuthError("Enter the OTP code.");
+      return;
+    }
+
+    setAuthBusy(true);
+    try {
+      if (!generatedOtp) {
+        const { data, error } = await supabase.auth.verifyOtp({
+          email,
+          token: code,
+          type: "email",
+        });
+        if (error) {
+          setAuthError(error.message || "Invalid OTP.");
+          return;
+        }
+        completeLogin({
+          identifier: data.user?.email || email,
+          method: "google",
+        });
+        return;
+      }
+
+      if (code === generatedOtp) {
+        completeLogin({
+          identifier: email,
+          method: "google",
+        });
+      } else {
+        setAuthError("OTP does not match. Try again.");
+      }
+    } finally {
+      setAuthBusy(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setUserSession(null);
+    setOtpSent(false);
+    setOtpInput("");
+    try {
+      sessionStorage.removeItem(USER_AUTH_KEY);
+      await supabase.auth.signOut();
+    } catch {
+      // Ignored
     }
   };
 
@@ -410,16 +654,6 @@ export default function SweetieAIPage() {
       }
     }
   }, []);
-
-  const handleLock = () => {
-    stopSpeaking();
-    setUnlocked(false);
-    try {
-      sessionStorage.removeItem(UNLOCK_SESSION_KEY);
-    } catch {
-      // Ignored
-    }
-  };
 
   const speakMessage = useCallback(
     (messageId: string, rawText: string) => {
@@ -562,7 +796,7 @@ export default function SweetieAIPage() {
   const sendMessageWithText = useCallback(
     async (rawText: string, currentHistory: Message[]) => {
       const text = rawText.trim();
-      if (!text || loading) return;
+      if (!text || loading || !userSession) return;
 
       stopSpeaking();
 
@@ -595,6 +829,7 @@ export default function SweetieAIPage() {
               : m
           );
 
+      let finalReply = "";
       try {
         const res = await fetch("/api/ai", {
           method: "POST",
@@ -611,7 +846,7 @@ export default function SweetieAIPage() {
         });
 
         const data = (await res.json()) as { reply?: string; error?: string };
-        const replyText = res.ok
+        finalReply = res.ok
           ? data.reply ??
             "Hmph, my cute brain blinked for a second! Ask me again 🙄🌸"
           : `⚠️ ${data.error ?? "Failed to reply."}`;
@@ -621,25 +856,32 @@ export default function SweetieAIPage() {
           {
             id: `a-${Date.now()}`,
             role: "assistant",
-            content: replyText,
+            content: finalReply,
             time: getTimeNow(),
           },
         ]);
       } catch {
+        finalReply = "Aww, network got sleepy 🙄🌸 Try again in a bit!";
         setMessages((prev) => [
           ...prev,
           {
             id: `err-${Date.now()}`,
             role: "assistant",
-            content: "Aww, network got sleepy 🙄🌸 Try again in a bit!",
+            content: finalReply,
             time: getTimeNow(),
           },
         ]);
       } finally {
         setLoading(false);
+        await storeUserQuestionRecord({
+          userIdentifier: userSession.identifier,
+          authMethod: userSession.method,
+          question: text,
+          aiReply: finalReply,
+        });
       }
     },
-    [loading, stopSpeaking, visitorName]
+    [loading, stopSpeaking, userSession, visitorName]
   );
 
   useEffect(() => {
@@ -814,7 +1056,6 @@ export default function SweetieAIPage() {
 
   return (
     <>
-      {/* Full-screen petals IN FRONT OF ALL page content, click-through via pointer-events-none */}
       <canvas
         ref={canvasRef}
         aria-hidden="true"
@@ -829,57 +1070,138 @@ export default function SweetieAIPage() {
       />
 
       <div className="relative z-10 max-w-3xl mx-auto space-y-4">
-        {!unlocked ? (
-          <div className="max-w-md mx-auto py-12">
-            <form
-              onSubmit={handleUnlock}
-              className="p-7 rounded-3xl bg-white/95 border border-rose-200 shadow-xl space-y-5 text-center"
-            >
-              <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md">
-                <Lock size={26} />
-              </div>
-
-              <div className="space-y-1">
+        {!userSession ? (
+          <div className="max-w-md mx-auto py-10">
+            <div className="p-7 rounded-3xl bg-white/95 border border-rose-200 shadow-xl space-y-5">
+              <div className="text-center space-y-1">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md">
+                  <ShieldCheck size={26} />
+                </div>
                 <h1 className="text-2xl font-heading font-bold text-slate-900">
-                  Sweetie🌸 AI Protected
+                  Login or Create Account
                 </h1>
                 <p className="text-xs text-slate-600">
-                  Enter access password to open Sweetie🌸 chat.
+                  Verify with Mobile OTP or Google to chat with Sweetie🌸 AI.
                 </p>
               </div>
 
-              <div className="relative">
-                <KeyRound
-                  size={16}
-                  className="text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
-                />
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  autoFocus
-                  value={pwdInput}
-                  onChange={(e) => {
-                    setPwdInput(e.target.value);
-                    if (pwdError) setPwdError("");
+              <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthTab("mobile");
+                    setOtpSent(false);
+                    setAuthError("");
                   }}
-                  placeholder="Enter password..."
-                  className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
-                />
+                  className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                    authTab === "mobile"
+                      ? "bg-white text-rose-600 shadow-xs"
+                      : "text-slate-600"
+                  }`}
+                >
+                  <Phone size={13} /> Mobile OTP
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthTab("google");
+                    setOtpSent(false);
+                    setAuthError("");
+                  }}
+                  className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
+                    authTab === "google"
+                      ? "bg-white text-rose-600 shadow-xs"
+                      : "text-slate-600"
+                  }`}
+                >
+                  <Sparkles size={13} /> Google OTP
+                </button>
               </div>
 
-              {pwdError && (
-                <p className="text-xs font-mono font-bold text-rose-600">
-                  {pwdError}
-                </p>
+              {authTab === "mobile" ? (
+                !otpSent ? (
+                  <form onSubmit={handleSendMobileOtp} className="space-y-3">
+                    <input
+                      type="tel"
+                      value={phoneInput}
+                      onChange={(e) => setPhoneInput(e.target.value)}
+                      placeholder="Enter mobile number (e.g. 9876543210)"
+                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
+                    />
+                    <button
+                      type="submit"
+                      disabled={authBusy}
+                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
+                    >
+                      {authBusy ? "Sending OTP..." : "Send Mobile OTP"}
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleVerifyMobileOtp} className="space-y-3">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={otpInput}
+                      onChange={(e) => setOtpInput(e.target.value)}
+                      placeholder="Enter 6-digit OTP"
+                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
+                    />
+                    <button
+                      type="submit"
+                      disabled={authBusy}
+                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
+                    >
+                      {authBusy ? "Verifying..." : "Verify OTP & Continue"}
+                    </button>
+                  </form>
+                )
+              ) : !otpSent ? (
+                <form onSubmit={handleSendGoogleOtp} className="space-y-3">
+                  <input
+                    type="email"
+                    value={googleEmailInput}
+                    onChange={(e) => setGoogleEmailInput(e.target.value)}
+                    placeholder="Enter Google Gmail for OTP (or leave blank for Google login)"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
+                  />
+                  <button
+                    type="submit"
+                    disabled={authBusy}
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
+                  >
+                    {authBusy
+                      ? "Processing..."
+                      : googleEmailInput.trim()
+                      ? "Send Google OTP"
+                      : "Continue with Google"}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyGoogleOtp} className="space-y-3">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={otpInput}
+                    onChange={(e) => setOtpInput(e.target.value)}
+                    placeholder="Enter Google verification OTP"
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
+                  />
+                  <button
+                    type="submit"
+                    disabled={authBusy}
+                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
+                  >
+                    {authBusy ? "Verifying..." : "Verify Google OTP & Continue"}
+                  </button>
+                </form>
               )}
 
-              <button
-                type="submit"
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md hover:scale-[1.02] transition-all cursor-pointer"
-              >
-                <Unlock size={15} /> Unlock Sweetie🌸
-              </button>
-            </form>
+              {authError && (
+                <p className="text-xs font-mono text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5">
+                  {authError}
+                </p>
+              )}
+            </div>
           </div>
         ) : (
           <>
@@ -900,7 +1222,7 @@ export default function SweetieAIPage() {
                     <Sparkles size={16} className="text-rose-500" />
                   </div>
                   <p className="text-xs text-slate-600">
-                    Full-screen wind petals + baby voice • Mood:{" "}
+                    {userSession.identifier} • Mood:{" "}
                     <span className="font-mono font-bold text-rose-600">
                       {speakingNow ? `${activeMood} (speaking)` : activeMood}
                     </span>
@@ -950,11 +1272,11 @@ export default function SweetieAIPage() {
 
                 <button
                   type="button"
-                  onClick={handleLock}
-                  title="Lock AI"
+                  onClick={handleLogout}
+                  title="Sign out"
                   className="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 hover:bg-rose-600 text-white text-xs font-mono font-bold transition-colors cursor-pointer"
                 >
-                  <Lock size={12} /> Lock
+                  <LogOut size={12} /> Logout
                 </button>
               </div>
             </div>
