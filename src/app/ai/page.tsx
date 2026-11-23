@@ -13,7 +13,6 @@ import {
   Square,
   Cog,
   LogOut,
-  Phone,
   ShieldCheck,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -71,7 +70,7 @@ interface Petal {
 
 interface ActiveUserSession {
   identifier: string;
-  method: "google" | "mobile-otp";
+  method: "google";
 }
 
 const USER_AUTH_KEY = "sweetie_ai_user_session_v1";
@@ -92,7 +91,7 @@ const THINKING_PHRASES = [
   "Give me a sec, making it extra cute... 🌸😌",
 ];
 
-function ColourfulGoogleLogo({ size = 15 }: { size?: number }) {
+function ColourfulGoogleLogo({ size = 16 }: { size?: number }) {
   return (
     <svg
       width={size}
@@ -282,7 +281,7 @@ function drawRealisticPetal(ctx: CanvasRenderingContext2D, p: Petal) {
 
 async function storeUserQuestionRecord(params: {
   userIdentifier: string;
-  authMethod: "google" | "mobile-otp";
+  authMethod: "google";
   question: string;
   aiReply: string;
 }) {
@@ -314,12 +313,6 @@ export default function SweetieAIPage() {
   const [userSession, setUserSession] = useState<ActiveUserSession | null>(
     null
   );
-
-  const [authTab, setAuthTab] = useState<"mobile" | "google">("mobile");
-  const [phoneInput, setPhoneInput] = useState("");
-  const [googleEmailInput, setGoogleEmailInput] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpInput, setOtpInput] = useState("");
   const [authError, setAuthError] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
 
@@ -359,11 +352,11 @@ export default function SweetieAIPage() {
     }
 
     supabase.auth.getUser().then(({ data }) => {
-      const user = data?.user;
-      if (user?.email || user?.phone) {
+      const email = data?.user?.email;
+      if (email) {
         const sess: ActiveUserSession = {
-          identifier: user.email || user.phone || "",
-          method: user.email ? "google" : "mobile-otp",
+          identifier: email,
+          method: "google",
         };
         setUserSession(sess);
         try {
@@ -377,14 +370,13 @@ export default function SweetieAIPage() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      const user = session?.user;
-      if (user?.email || user?.phone) {
+      const email = session?.user?.email;
+      if (email) {
         const sess: ActiveUserSession = {
-          identifier: user.email || user.phone || "",
-          method: user.email ? "google" : "mobile-otp",
+          identifier: email,
+          method: "google",
         };
         setUserSession(sess);
-        setOtpSent(false);
         setAuthError("");
         try {
           sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
@@ -499,155 +491,31 @@ export default function SweetieAIPage() {
     };
   }, []);
 
-  const completeLogin = (sess: ActiveUserSession) => {
-    setUserSession(sess);
+  const handleContinueWithGoogle = async () => {
     setAuthError("");
-    setOtpSent(false);
-    setOtpInput("");
-    try {
-      sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
-    } catch {
-      // Ignored
-    }
-  };
-
-  const handleSendMobileOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError("");
-    const cleaned = phoneInput.trim();
-    if (cleaned.length < 8) {
-      setAuthError("Please enter a valid mobile number with country code.");
-      return;
-    }
-
-    const formattedPhone = cleaned.startsWith("+") ? cleaned : `+91${cleaned}`;
     setAuthBusy(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/ai`
+          : undefined;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
       });
       if (error) {
-        setAuthError(error.message || "Failed to send SMS OTP.");
-        return;
+        setAuthError(error.message || "Google sign-in failed.");
+        setAuthBusy(false);
       }
-      setOtpSent(true);
     } catch {
-      setAuthError("Unable to send SMS OTP. Check Supabase Phone Auth settings.");
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
-  const handleVerifyMobileOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError("");
-    const cleaned = phoneInput.trim();
-    const formattedPhone = cleaned.startsWith("+") ? cleaned : `+91${cleaned}`;
-    const code = otpInput.trim();
-
-    if (!code) {
-      setAuthError("Please enter the OTP received on your phone.");
-      return;
-    }
-
-    setAuthBusy(true);
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone: formattedPhone,
-        token: code,
-        type: "sms",
-      });
-      if (error) {
-        setAuthError(error.message || "Invalid OTP code.");
-        return;
-      }
-      completeLogin({
-        identifier: data.user?.phone || formattedPhone,
-        method: "mobile-otp",
-      });
-    } catch {
-      setAuthError("OTP verification failed.");
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
-  const handleSendGoogleOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError("");
-    const email = googleEmailInput.trim();
-
-    setAuthBusy(true);
-    try {
-      if (!email) {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo:
-              typeof window !== "undefined"
-                ? `${window.location.origin}/ai`
-                : undefined,
-          },
-        });
-        if (error) {
-          setAuthError(error.message || "Google sign-in failed.");
-        }
-        return;
-      }
-
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
-        options: { shouldCreateUser: true },
-      });
-      if (error) {
-        setAuthError(error.message || "Failed to send OTP email.");
-        return;
-      }
-      setOtpSent(true);
-    } catch {
-      setAuthError("Could not start verification.");
-    } finally {
-      setAuthBusy(false);
-    }
-  };
-
-  const handleVerifyGoogleOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError("");
-    const email = googleEmailInput.trim();
-    const code = otpInput.trim();
-
-    if (!code) {
-      setAuthError("Please enter the 6-digit OTP code.");
-      return;
-    }
-
-    setAuthBusy(true);
-    try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: "email",
-      });
-      if (error) {
-        setAuthError(error.message || "Invalid OTP code.");
-        return;
-      }
-      completeLogin({
-        identifier: data.user?.email || email,
-        method: "google",
-      });
-    } catch {
-      setAuthError("OTP verification failed.");
-    } finally {
+      setAuthError("Could not start Google sign-in.");
       setAuthBusy(false);
     }
   };
 
   const handleLogout = async () => {
     setUserSession(null);
-    setOtpSent(false);
-    setOtpInput("");
+    setAuthBusy(false);
     try {
       sessionStorage.removeItem(USER_AUTH_KEY);
       await supabase.auth.signOut();
@@ -1084,133 +952,32 @@ export default function SweetieAIPage() {
 
       <div className="relative z-10 max-w-3xl mx-auto space-y-4">
         {!userSession ? (
-          <div className="max-w-md mx-auto py-10">
-            <div className="p-7 rounded-3xl bg-white/95 border border-rose-200 shadow-xl space-y-5">
-              <div className="text-center space-y-1">
-                <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md">
-                  <ShieldCheck size={26} />
-                </div>
+          <div className="max-w-md mx-auto py-12">
+            <div className="p-7 rounded-3xl bg-white/95 border border-rose-200 shadow-xl space-y-5 text-center">
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md">
+                <ShieldCheck size={26} />
+              </div>
+
+              <div className="space-y-1">
                 <h1 className="text-2xl font-heading font-bold text-slate-900">
                   Login or Create Account
                 </h1>
                 <p className="text-xs text-slate-600">
-                  Verify with Mobile OTP or Google to chat with Sweetie🌸 AI.
+                  Sign in with your Google account to chat with Sweetie🌸 AI.
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthTab("mobile");
-                    setOtpSent(false);
-                    setAuthError("");
-                  }}
-                  className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
-                    authTab === "mobile"
-                      ? "bg-white text-rose-600 shadow-xs"
-                      : "text-slate-600"
-                  }`}
-                >
-                  <Phone size={13} /> Mobile OTP
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthTab("google");
-                    setOtpSent(false);
-                    setAuthError("");
-                  }}
-                  className={`inline-flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer ${
-                    authTab === "google"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-600"
-                  }`}
-                >
-                  <ColourfulGoogleLogo size={14} /> Google OTP
-                </button>
-              </div>
-
-              {authTab === "mobile" ? (
-                !otpSent ? (
-                  <form onSubmit={handleSendMobileOtp} className="space-y-3">
-                    <input
-                      type="tel"
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
-                      placeholder="Enter mobile number (e.g. +919876543210)"
-                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
-                    />
-                    <button
-                      type="submit"
-                      disabled={authBusy}
-                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
-                    >
-                      {authBusy ? "Sending OTP..." : "Send Mobile OTP"}
-                    </button>
-                  </form>
-                ) : (
-                  <form onSubmit={handleVerifyMobileOtp} className="space-y-3">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={otpInput}
-                      onChange={(e) => setOtpInput(e.target.value)}
-                      placeholder="Enter OTP sent to your mobile"
-                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
-                    />
-                    <button
-                      type="submit"
-                      disabled={authBusy}
-                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
-                    >
-                      {authBusy ? "Verifying..." : "Verify OTP & Continue"}
-                    </button>
-                  </form>
-                )
-              ) : !otpSent ? (
-                <form onSubmit={handleSendGoogleOtp} className="space-y-3">
-                  <input
-                    type="email"
-                    value={googleEmailInput}
-                    onChange={(e) => setGoogleEmailInput(e.target.value)}
-                    placeholder="Enter Google Gmail for OTP (or leave blank for Google login)"
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
-                  />
-                  <button
-                    type="submit"
-                    disabled={authBusy}
-                    className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
-                  >
-                    <ColourfulGoogleLogo size={15} />
-                    <span>
-                      {authBusy
-                        ? "Processing..."
-                        : googleEmailInput.trim()
-                        ? "Send Google OTP"
-                        : "Continue with Google"}
-                    </span>
-                  </button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyGoogleOtp} className="space-y-3">
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={otpInput}
-                    onChange={(e) => setOtpInput(e.target.value)}
-                    placeholder="Enter 6-digit OTP sent to your email"
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
-                  />
-                  <button
-                    type="submit"
-                    disabled={authBusy}
-                    className="w-full py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md cursor-pointer disabled:opacity-60"
-                  >
-                    {authBusy ? "Verifying..." : "Verify Google OTP & Continue"}
-                  </button>
-                </form>
-              )}
+              <button
+                type="button"
+                disabled={authBusy}
+                onClick={handleContinueWithGoogle}
+                className="w-full inline-flex items-center justify-center gap-2.5 px-5 py-3.5 rounded-2xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 text-slate-900 font-mono text-xs font-bold shadow-md hover:scale-[1.02] transition-all cursor-pointer disabled:opacity-60"
+              >
+                <ColourfulGoogleLogo size={18} />
+                <span>
+                  {authBusy ? "Redirecting to Google..." : "Continue with Google"}
+                </span>
+              </button>
 
               {authError && (
                 <p className="text-xs font-mono text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5">
