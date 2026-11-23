@@ -207,7 +207,7 @@ function drawRealisticPetal(ctx: CanvasRenderingContext2D, p: Petal) {
   ctx.translate(p.x, p.y);
   ctx.rotate(p.rotation);
 
-  ctx.shadowColor = `rgba(136, 19, 55, ${0.26 * p.alpha})`;
+  ctx.shadowColor = `rgba(136, 19, 55, ${0.28 * p.alpha})`;
   ctx.shadowBlur = 9;
   ctx.shadowOffsetX = 2;
   ctx.shadowOffsetY = 5;
@@ -280,8 +280,7 @@ export default function SweetieAIPage() {
   const holdingRef = useRef(false);
   const speakSessionRef = useRef(0);
 
-  // Full-screen slow-motion wind-blown petals across BOTH locked & unlocked screens
-  // Falls all the way to the bottom edge and slowly fades/disappears
+  // Full-screen petals in front of all content on BOTH lock & chat screens
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -296,7 +295,7 @@ export default function SweetieAIPage() {
         PETAL_PALETTE[Math.floor(Math.random() * PETAL_PALETTE.length)];
       const spreadX =
         typeof slotIndex === "number"
-          ? ((slotIndex + 0.5) / 60) * width + (Math.random() - 0.5) * 28
+          ? ((slotIndex + 0.5) / 64) * width + (Math.random() - 0.5) * 28
           : Math.random() * width;
 
       return {
@@ -318,7 +317,7 @@ export default function SweetieAIPage() {
       };
     };
 
-    petalsRef.current = Array.from({ length: 60 }, (_, idx) =>
+    petalsRef.current = Array.from({ length: 64 }, (_, idx) =>
       createPetal(false, idx)
     );
 
@@ -359,7 +358,6 @@ export default function SweetieAIPage() {
         if (p.x < -28) p.x = width + 22;
         if (p.x > width + 28) p.x = -22;
 
-        // Start slowly fading near bottom edge and disappear completely
         if (p.y >= height - 65) {
           p.fading = true;
         }
@@ -815,328 +813,339 @@ export default function SweetieAIPage() {
   const isChatAnimated = holdingMic || speakingNow;
 
   return (
-    <div className="relative max-w-3xl mx-auto space-y-4 animate-fade-up">
-      {/* Full-screen petals across BOTH Lock & Chat views, fading out gently at bottom edge */}
+    <>
+      {/* Full-screen petals IN FRONT OF ALL page content, click-through via pointer-events-none */}
       <canvas
         ref={canvasRef}
         aria-hidden="true"
-        className="pointer-events-none fixed left-0 top-0 w-screen h-screen z-20"
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 9999,
+          pointerEvents: "none",
+        }}
       />
 
-      {!unlocked ? (
-        <div className="relative z-30 max-w-md mx-auto py-12">
-          <form
-            onSubmit={handleUnlock}
-            className="p-7 rounded-3xl bg-white/95 border border-rose-200 shadow-xl space-y-5 text-center"
-          >
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md">
-              <Lock size={26} />
-            </div>
-
-            <div className="space-y-1">
-              <h1 className="text-2xl font-heading font-bold text-slate-900">
-                Sweetie🌸 AI Protected
-              </h1>
-              <p className="text-xs text-slate-600">
-                Enter access password to open Sweetie🌸 chat.
-              </p>
-            </div>
-
-            <div className="relative">
-              <KeyRound
-                size={16}
-                className="text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
-              />
-              <input
-                type="password"
-                inputMode="numeric"
-                autoFocus
-                value={pwdInput}
-                onChange={(e) => {
-                  setPwdInput(e.target.value);
-                  if (pwdError) setPwdError("");
-                }}
-                placeholder="Enter password..."
-                className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
-              />
-            </div>
-
-            {pwdError && (
-              <p className="text-xs font-mono font-bold text-rose-600">
-                {pwdError}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md hover:scale-[1.02] transition-all cursor-pointer"
+      <div className="relative z-10 max-w-3xl mx-auto space-y-4">
+        {!unlocked ? (
+          <div className="max-w-md mx-auto py-12">
+            <form
+              onSubmit={handleUnlock}
+              className="p-7 rounded-3xl bg-white/95 border border-rose-200 shadow-xl space-y-5 text-center"
             >
-              <Unlock size={15} /> Unlock Sweetie🌸
-            </button>
-          </form>
-        </div>
-      ) : (
-        <>
-          <div className="relative z-30 rounded-3xl px-5 py-4 bg-gradient-to-r from-rose-50/95 via-white/95 to-pink-50/95 border border-rose-200 shadow-lg flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div
-                className={`w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 via-pink-500 to-amber-400 text-white flex items-center justify-center shadow-md transition-transform duration-300 ${
-                  speakingNow ? "scale-110 animate-bounce" : ""
-                }`}
-              >
-                <Cog size={22} />
+              <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md">
+                <Lock size={26} />
               </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900">
-                    Sweetie🌸
-                  </h1>
-                  <Sparkles size={16} className="text-rose-500" />
-                </div>
+
+              <div className="space-y-1">
+                <h1 className="text-2xl font-heading font-bold text-slate-900">
+                  Sweetie🌸 AI Protected
+                </h1>
                 <p className="text-xs text-slate-600">
-                  Full-screen wind petals + baby voice • Mood:{" "}
-                  <span className="font-mono font-bold text-rose-600">
-                    {speakingNow ? `${activeMood} (speaking)` : activeMood}
-                  </span>
+                  Enter access password to open Sweetie🌸 chat.
                 </p>
               </div>
-            </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {editingName ? (
-                <form
-                  onSubmit={handleSaveName}
-                  className="flex items-center gap-1.5"
-                >
-                  <input
-                    type="text"
-                    value={nameInput}
-                    onChange={(e) => setNameInput(e.target.value)}
-                    placeholder="Your name..."
-                    autoFocus
-                    className="w-28 px-3 py-1.5 rounded-xl bg-white border border-rose-300 text-xs focus:outline-none"
-                  />
-                  <button
-                    type="submit"
-                    className="px-3 py-1.5 rounded-xl bg-rose-500 text-white text-xs font-bold cursor-pointer"
-                  >
-                    Save
-                  </button>
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditingName(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-mono font-bold text-rose-700 cursor-pointer"
-                >
-                  <Smile size={13} />
-                  {visitorName ? `Hi, ${visitorName}` : "Tell me your name"}
-                </button>
+              <div className="relative">
+                <KeyRound
+                  size={16}
+                  className="text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
+                />
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoFocus
+                  value={pwdInput}
+                  onChange={(e) => {
+                    setPwdInput(e.target.value);
+                    if (pwdError) setPwdError("");
+                  }}
+                  placeholder="Enter password..."
+                  className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm font-mono text-slate-900"
+                />
+              </div>
+
+              {pwdError && (
+                <p className="text-xs font-mono font-bold text-rose-600">
+                  {pwdError}
+                </p>
               )}
-
-              <button
-                type="button"
-                onClick={handleClear}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200 text-xs font-mono font-bold text-slate-700 cursor-pointer"
-              >
-                <Trash2 size={13} /> Clear
-              </button>
-
-              <button
-                type="button"
-                onClick={handleLock}
-                title="Lock AI"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 hover:bg-rose-600 text-white text-xs font-mono font-bold transition-colors cursor-pointer"
-              >
-                <Lock size={12} /> Lock
-              </button>
-            </div>
-          </div>
-
-          <div
-            className={`relative z-30 rounded-[2rem] bg-white/95 border shadow-xl overflow-hidden flex flex-col h-[64vh] min-h-[430px] transition-all duration-300 ${
-              isChatAnimated
-                ? "border-rose-400 ring-4 ring-rose-400/35 shadow-[0_0_40px_rgba(244,63,94,0.28)] scale-[1.01] animate-pulse"
-                : "border-rose-200/80"
-            }`}
-          >
-            {holdingMic && (
-              <div className="px-4 py-2 bg-gradient-to-r from-rose-500 via-pink-500 to-sky-500 text-white text-xs font-mono font-bold flex items-center justify-between animate-pulse">
-                <span>Sweetie is listening while you hold the mic...</span>
-                <span>Release to finish</span>
-              </div>
-            )}
-
-            {!holdingMic && speakingNow && (
-              <div className="px-4 py-2 bg-gradient-to-r from-pink-500 via-rose-400 to-amber-400 text-white text-xs font-mono font-bold flex items-center justify-between animate-pulse">
-                <span>Sweetie is speaking with cute exhales ({activeMood})...</span>
-                <button
-                  type="button"
-                  onClick={stopSpeaking}
-                  className="underline text-[11px] cursor-pointer"
-                >
-                  Stop voice
-                </button>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gradient-to-b from-rose-50/40 via-white to-pink-50/40">
-              {messages.map((msg) => {
-                const isUser = msg.role === "user";
-                const isThisSpeaking = speakingMessageId === msg.id;
-
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex items-end gap-2.5 ${
-                      isUser ? "flex-row-reverse" : "flex-row"
-                    }`}
-                  >
-                    <div
-                      className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
-                        isUser
-                          ? "bg-slate-900 text-white"
-                          : "bg-gradient-to-br from-rose-500 to-pink-500 text-white"
-                      }`}
-                    >
-                      {isUser ? <User size={15} /> : <Cog size={15} />}
-                    </div>
-
-                    <div
-                      className={`max-w-[82%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-                        isUser
-                          ? "rounded-3xl rounded-br-md bg-slate-900 text-white shadow-md"
-                          : "rounded-3xl rounded-bl-md bg-white border border-rose-100 text-slate-800 shadow-sm"
-                      }`}
-                    >
-                      <div>{msg.content}</div>
-                      <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] font-mono text-slate-400">
-                        <span>{msg.time}</span>
-                        {!isUser && (
-                          <div className="flex items-center gap-2.5">
-                            <button
-                              type="button"
-                              onClick={() => speakMessage(msg.id, msg.content)}
-                              aria-label={
-                                isThisSpeaking
-                                  ? "Stop speaking reply"
-                                  : "Speak reply"
-                              }
-                              title={
-                                isThisSpeaking
-                                  ? "Stop speaking"
-                                  : "Listen to reply"
-                              }
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full transition-colors cursor-pointer ${
-                                isThisSpeaking
-                                  ? "bg-rose-100 text-rose-700 font-bold"
-                                  : "hover:bg-rose-50 hover:text-rose-600"
-                              }`}
-                            >
-                              {isThisSpeaking ? (
-                                <>
-                                  <Square size={10} className="fill-current" />{" "}
-                                  Stop
-                                </>
-                              ) : (
-                                <>
-                                  <Volume2 size={12} /> Speak
-                                </>
-                              )}
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(msg.id, msg.content)}
-                              className="inline-flex items-center gap-1 hover:text-rose-600 cursor-pointer"
-                            >
-                              {copiedId === msg.id ? (
-                                <>
-                                  <Check size={11} /> Copied
-                                </>
-                              ) : (
-                                <>
-                                  <Copy size={11} /> Copy
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {loading && (
-                <div className="flex items-end gap-2.5">
-                  <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shrink-0">
-                    <Cog size={15} className="animate-spin" />
-                  </div>
-                  <div className="px-4 py-3 rounded-3xl rounded-bl-md bg-white border border-rose-200 text-xs font-mono font-bold text-rose-600 shadow-sm">
-                    {THINKING_PHRASES[thinkingIdx]}
-                  </div>
-                </div>
-              )}
-
-              <div ref={bottomRef} />
-            </div>
-
-            {micError && (
-              <div className="px-4 py-1.5 bg-rose-50 border-t border-rose-200 text-[11px] font-mono text-rose-700">
-                {micError}
-              </div>
-            )}
-
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                sendMessageWithText(input, messages);
-              }}
-              className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
-            >
-              <button
-                type="button"
-                onPointerDown={startHoldToSpeak}
-                onPointerUp={stopHoldToSpeak}
-                onPointerLeave={stopHoldToSpeak}
-                onPointerCancel={stopHoldToSpeak}
-                onContextMenu={(e) => e.preventDefault()}
-                aria-label="Hold to speak"
-                title="Press and hold to speak"
-                className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border text-xs font-mono font-bold transition-all select-none touch-none cursor-pointer shrink-0 ${
-                  holdingMic
-                    ? "bg-rose-500 border-rose-500 text-white scale-105 shadow-md"
-                    : "bg-slate-50 hover:bg-rose-50 border-slate-200 text-slate-700"
-                }`}
-              >
-                <Mic size={16} />
-                <span className="hidden sm:inline">
-                  {holdingMic ? "Speaking..." : "Hold Mic"}
-                </span>
-              </button>
-
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={
-                  holdingMic ? "Hold & speak now..." : "Ask Sweetie anything..."
-                }
-                className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm text-slate-900"
-              />
 
               <button
                 type="submit"
-                disabled={loading || !input.trim()}
-                className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md hover:scale-105 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md hover:scale-[1.02] transition-all cursor-pointer"
               >
-                <Send size={14} /> Send
+                <Unlock size={15} /> Unlock Sweetie🌸
               </button>
             </form>
           </div>
-        </>
-      )}
-    </div>
+        ) : (
+          <>
+            <div className="rounded-3xl px-5 py-4 bg-gradient-to-r from-rose-50/95 via-white/95 to-pink-50/95 border border-rose-200 shadow-lg flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 via-pink-500 to-amber-400 text-white flex items-center justify-center shadow-md transition-transform duration-300 ${
+                    speakingNow ? "scale-110 animate-bounce" : ""
+                  }`}
+                >
+                  <Cog size={22} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900">
+                      Sweetie🌸
+                    </h1>
+                    <Sparkles size={16} className="text-rose-500" />
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Full-screen wind petals + baby voice • Mood:{" "}
+                    <span className="font-mono font-bold text-rose-600">
+                      {speakingNow ? `${activeMood} (speaking)` : activeMood}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {editingName ? (
+                  <form
+                    onSubmit={handleSaveName}
+                    className="flex items-center gap-1.5"
+                  >
+                    <input
+                      type="text"
+                      value={nameInput}
+                      onChange={(e) => setNameInput(e.target.value)}
+                      placeholder="Your name..."
+                      autoFocus
+                      className="w-28 px-3 py-1.5 rounded-xl bg-white border border-rose-300 text-xs focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      className="px-3 py-1.5 rounded-xl bg-rose-500 text-white text-xs font-bold cursor-pointer"
+                    >
+                      Save
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setEditingName(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-mono font-bold text-rose-700 cursor-pointer"
+                  >
+                    <Smile size={13} />
+                    {visitorName ? `Hi, ${visitorName}` : "Tell me your name"}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200 text-xs font-mono font-bold text-slate-700 cursor-pointer"
+                >
+                  <Trash2 size={13} /> Clear
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLock}
+                  title="Lock AI"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-900 hover:bg-rose-600 text-white text-xs font-mono font-bold transition-colors cursor-pointer"
+                >
+                  <Lock size={12} /> Lock
+                </button>
+              </div>
+            </div>
+
+            <div
+              className={`rounded-[2rem] bg-white/95 border shadow-xl overflow-hidden flex flex-col h-[64vh] min-h-[430px] transition-all duration-300 ${
+                isChatAnimated
+                  ? "border-rose-400 ring-4 ring-rose-400/35 shadow-[0_0_40px_rgba(244,63,94,0.28)] scale-[1.01] animate-pulse"
+                  : "border-rose-200/80"
+              }`}
+            >
+              {holdingMic && (
+                <div className="px-4 py-2 bg-gradient-to-r from-rose-500 via-pink-500 to-sky-500 text-white text-xs font-mono font-bold flex items-center justify-between animate-pulse">
+                  <span>Sweetie is listening while you hold the mic...</span>
+                  <span>Release to finish</span>
+                </div>
+              )}
+
+              {!holdingMic && speakingNow && (
+                <div className="px-4 py-2 bg-gradient-to-r from-pink-500 via-rose-400 to-amber-400 text-white text-xs font-mono font-bold flex items-center justify-between animate-pulse">
+                  <span>
+                    Sweetie is speaking with cute exhales ({activeMood})...
+                  </span>
+                  <button
+                    type="button"
+                    onClick={stopSpeaking}
+                    className="underline text-[11px] cursor-pointer"
+                  >
+                    Stop voice
+                  </button>
+                </div>
+              )}
+
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gradient-to-b from-rose-50/40 via-white to-pink-50/40">
+                {messages.map((msg) => {
+                  const isUser = msg.role === "user";
+                  const isThisSpeaking = speakingMessageId === msg.id;
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex items-end gap-2.5 ${
+                        isUser ? "flex-row-reverse" : "flex-row"
+                      }`}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${
+                          isUser
+                            ? "bg-slate-900 text-white"
+                            : "bg-gradient-to-br from-rose-500 to-pink-500 text-white"
+                        }`}
+                      >
+                        {isUser ? <User size={15} /> : <Cog size={15} />}
+                      </div>
+
+                      <div
+                        className={`max-w-[82%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                          isUser
+                            ? "rounded-3xl rounded-br-md bg-slate-900 text-white shadow-md"
+                            : "rounded-3xl rounded-bl-md bg-white border border-rose-100 text-slate-800 shadow-sm"
+                        }`}
+                      >
+                        <div>{msg.content}</div>
+                        <div className="mt-1.5 flex items-center justify-between gap-3 text-[10px] font-mono text-slate-400">
+                          <span>{msg.time}</span>
+                          {!isUser && (
+                            <div className="flex items-center gap-2.5">
+                              <button
+                                type="button"
+                                onClick={() => speakMessage(msg.id, msg.content)}
+                                aria-label={
+                                  isThisSpeaking
+                                    ? "Stop speaking reply"
+                                    : "Speak reply"
+                                }
+                                title={
+                                  isThisSpeaking
+                                    ? "Stop speaking"
+                                    : "Listen to reply"
+                                }
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full transition-colors cursor-pointer ${
+                                  isThisSpeaking
+                                    ? "bg-rose-100 text-rose-700 font-bold"
+                                    : "hover:bg-rose-50 hover:text-rose-600"
+                                }`}
+                              >
+                                {isThisSpeaking ? (
+                                  <>
+                                    <Square size={10} className="fill-current" />{" "}
+                                    Stop
+                                  </>
+                                ) : (
+                                  <>
+                                    <Volume2 size={12} /> Speak
+                                  </>
+                                )}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleCopy(msg.id, msg.content)}
+                                className="inline-flex items-center gap-1 hover:text-rose-600 cursor-pointer"
+                              >
+                                {copiedId === msg.id ? (
+                                  <>
+                                    <Check size={11} /> Copied
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy size={11} /> Copy
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {loading && (
+                  <div className="flex items-end gap-2.5">
+                    <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shrink-0">
+                      <Cog size={15} className="animate-spin" />
+                    </div>
+                    <div className="px-4 py-3 rounded-3xl rounded-bl-md bg-white border border-rose-200 text-xs font-mono font-bold text-rose-600 shadow-sm">
+                      {THINKING_PHRASES[thinkingIdx]}
+                    </div>
+                  </div>
+                )}
+
+                <div ref={bottomRef} />
+              </div>
+
+              {micError && (
+                <div className="px-4 py-1.5 bg-rose-50 border-t border-rose-200 text-[11px] font-mono text-rose-700">
+                  {micError}
+                </div>
+              )}
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  sendMessageWithText(input, messages);
+                }}
+                className="p-3 bg-white border-t border-slate-200 flex items-center gap-2"
+              >
+                <button
+                  type="button"
+                  onPointerDown={startHoldToSpeak}
+                  onPointerUp={stopHoldToSpeak}
+                  onPointerLeave={stopHoldToSpeak}
+                  onPointerCancel={stopHoldToSpeak}
+                  onContextMenu={(e) => e.preventDefault()}
+                  aria-label="Hold to speak"
+                  title="Press and hold to speak"
+                  className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-2xl border text-xs font-mono font-bold transition-all select-none touch-none cursor-pointer shrink-0 ${
+                    holdingMic
+                      ? "bg-rose-500 border-rose-500 text-white scale-105 shadow-md"
+                      : "bg-slate-50 hover:bg-rose-50 border-slate-200 text-slate-700"
+                  }`}
+                >
+                  <Mic size={16} />
+                  <span className="hidden sm:inline">
+                    {holdingMic ? "Speaking..." : "Hold Mic"}
+                  </span>
+                </button>
+
+                <input
+                  type="text"
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder={
+                    holdingMic ? "Hold & speak now..." : "Ask Sweetie anything..."
+                  }
+                  className="flex-1 px-4 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 focus:border-rose-400 focus:bg-white focus:outline-none text-sm text-slate-900"
+                />
+
+                <button
+                  type="submit"
+                  disabled={loading || !input.trim()}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 text-white font-mono text-xs font-bold shadow-md hover:scale-105 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                >
+                  <Send size={14} /> Send
+                </button>
+              </form>
+            </div>
+          </>
+        )}
+      </div>
+    </>
   );
 }
