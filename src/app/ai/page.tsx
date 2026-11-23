@@ -15,6 +15,8 @@ import {
   Lock,
   Unlock,
   KeyRound,
+  Brush,
+  Sparkles,
 } from "lucide-react";
 
 interface Message {
@@ -52,9 +54,32 @@ interface SpeechRecognizerLike {
   stop: () => void;
 }
 
+interface Petal {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  size: number;
+  rotation: number;
+  vRot: number;
+  swayPhase: number;
+  swaySpeed: number;
+  color: string;
+  settled: boolean;
+}
+
 const AI_ACCESS_PWD = "841694";
 const UNLOCK_SESSION_KEY = "sweetie_ai_unlocked_v1";
 const NAME_KEY = "sweetie_visitor_name";
+
+const PETAL_COLORS = [
+  "#fb7185",
+  "#f43f5e",
+  "#fda4af",
+  "#f472b6",
+  "#f9a8d4",
+  "#fecdd3",
+];
 
 const THINKING_PHRASES = [
   "Hold on, thinking with cute attitude... 🙄✨",
@@ -70,9 +95,6 @@ function getTimeNow() {
   }).format(new Date());
 }
 
-/**
- * Strips all emojis and emoji names so speech synthesis never reads emoji labels.
- */
 function sanitizeForSpeech(raw: string): string {
   return raw
     .replace(/[\u{1F300}-\u{1FAFF}]/gu, " ")
@@ -89,7 +111,7 @@ function sanitizeForSpeech(raw: string): string {
 }
 
 function isHindiWord(word: string): boolean {
-  if (/[\u0900-\u097F]/.test(word)) return true;
+  if (/[\u0900-\u{097F}]/.test(word)) return true;
   return /^(kya|hai|hain|hoon|hu|mera|meri|mere|tum|aap|kaise|kaisi|kyun|kyu|kyon|acha|achha|achchha|batao|sunao|pyaar|dil|yaar|haan|nahi|nhi|nahin|bhai|didi|shukriya|dhanyavaad|khush|udas|rona|hasna|bilkul|zaroor|suno|dekho|chalo|abhi|bahut|thoda|thora|kaun|kahan|kidhar|mat|karo|karna|raha|rahi|rahe|tha|thi|the|ho|toh|aur|lekin|par|se|ko|ka|ki|ke|mein|main|ne)$/i.test(
     word.replace(/[^a-zA-Z\u0900-\u097F]/g, "")
   );
@@ -97,14 +119,9 @@ function isHindiWord(word: string): boolean {
 
 function hasHindiText(text: string): boolean {
   if (/[\u0900-\u097F]/.test(text)) return true;
-  const words = text.split(/\s+/);
-  return words.some(isHindiWord);
+  return text.split(/\s+/).some(isHindiWord);
 }
 
-/**
- * Clarifies common Hinglish spellings into clear phonetics so speech engines
- * pronounce each Hindi/Hinglish word clearly.
- */
 function clarifyWordPhonetics(word: string): string {
   const clean = word.replace(/[^a-zA-Z\u0900-\u097F'?!.,]/g, "");
   const lower = clean.toLowerCase().replace(/[?!.,]/g, "");
@@ -114,7 +131,6 @@ function clarifyWordPhonetics(word: string): string {
   if (lower === "nahi" || lower === "nhi") return "nahin";
   if (lower === "thoda") return "thora";
   if (lower === "hoon" || lower === "hu") return "hoon";
-  if (lower === "main") return "main";
   return clean;
 }
 
@@ -122,7 +138,7 @@ type EmotionMood = "laugh" | "smile" | "cry" | "emotional" | "calm" | "attitude"
 
 function detectEmotionMood(text: string): EmotionMood {
   const lower = text.toLowerCase();
-  if (/\b(haha|hehe|lol|joke|funny|laugh|haso|hansi|mazak|funny)\b/i.test(lower)) {
+  if (/\b(haha|hehe|lol|joke|funny|laugh|haso|hansi|mazak)\b/i.test(lower)) {
     return "laugh";
   }
   if (/\b(cry|crying|sad|sorry|hurt|miss|lonely|tear|rona|udas|dukhi)\b/i.test(lower)) {
@@ -138,6 +154,39 @@ function detectEmotionMood(text: string): EmotionMood {
     return "attitude";
   }
   return "smile";
+}
+
+/**
+ * Adds soft baby-girl exhalation / sigh cues into the word stream so speech
+ * sounds gentle and expressive without slow punctuation dead pauses.
+ */
+function buildExhalationWordStream(words: string[], mood: EmotionMood): string[] {
+  const out: string[] = [];
+
+  if (mood === "cry") {
+    out.push("haaah...");
+  } else if (mood === "calm") {
+    out.push("phewww...");
+  } else if (mood === "emotional") {
+    out.push("ahhh...");
+  } else if (mood === "attitude") {
+    out.push("hmmph...");
+  } else if (mood === "laugh") {
+    out.push("hehe...");
+  } else {
+    out.push("ahhh...");
+  }
+
+  words.forEach((w, idx) => {
+    out.push(w);
+    if (idx > 0 && idx % 9 === 0) {
+      if (mood === "cry") out.push("haaah...");
+      else if (mood === "calm") out.push("phewww...");
+      else out.push("ahhh...");
+    }
+  });
+
+  return out;
 }
 
 export default function SweetieAIPage() {
@@ -160,10 +209,20 @@ export default function SweetieAIPage() {
   const [micError, setMicError] = useState("");
   const [activeMood, setActiveMood] = useState<EmotionMood>("smile");
 
+  // Draggable petal-sweeping brush state
+  const [brushPos, setBrushPos] = useState<{ x: number; y: number } | null>(
+    null
+  );
+  const [draggingBrush, setDraggingBrush] = useState(false);
+  const [sweptCount, setSweptCount] = useState(0);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const petalsRef = useRef<Petal[]>([]);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const recognitionRef = useRef<SpeechRecognizerLike | null>(null);
   const holdingRef = useRef(false);
   const speakSessionRef = useRef(0);
+  const draggingBrushRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -174,6 +233,151 @@ export default function SweetieAIPage() {
       // Ignored
     }
   }, []);
+
+  // Heavy gravity falling petals + bottom pile accumulation + manual brush sweeping
+  useEffect(() => {
+    if (!unlocked) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const createPetal = (startAtTop = true): Petal => ({
+      x: Math.random() * width,
+      y: startAtTop
+        ? -20 - Math.random() * 140
+        : Math.random() * (height - 40),
+      vx: (Math.random() - 0.5) * 1.4,
+      vy: 2.2 + Math.random() * 2.8,
+      size: 7 + Math.random() * 7,
+      rotation: Math.random() * Math.PI * 2,
+      vRot: (Math.random() - 0.5) * 0.08,
+      swayPhase: Math.random() * Math.PI * 2,
+      swaySpeed: 0.03 + Math.random() * 0.03,
+      color: PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)],
+      settled: false,
+    });
+
+    // Spawn a rich initial shower of petals
+    petalsRef.current = Array.from({ length: 140 }, () => createPetal(false));
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    window.addEventListener("resize", handleResize, { passive: true });
+
+    let animId = 0;
+    const gravityAccel = 0.065;
+    const maxPileHeight = 135;
+
+    const tick = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      // Continuously spawn falling petals from top so bottom pile grows richly
+      if (petalsRef.current.length < 360 && Math.random() < 0.72) {
+        petalsRef.current.push(createPetal(true));
+      }
+
+      const activePetals: Petal[] = [];
+
+      for (const p of petalsRef.current) {
+        if (!p.settled) {
+          p.swayPhase += p.swaySpeed;
+          p.vy = Math.min(7.5, p.vy + gravityAccel);
+          p.x += Math.sin(p.swayPhase) * 1.35 + p.vx * 0.35;
+          p.y += p.vy;
+          p.rotation += p.vRot;
+
+          // Keep inside horizontal bounds
+          if (p.x < 10) p.x = 10;
+          if (p.x > width - 10) p.x = width - 10;
+
+          // Floor & bottom pile landing
+          const pileJitter = ((Math.sin(p.x * 0.04) + 1) * 0.5) * maxPileHeight;
+          const floorY = height - 10 - pileJitter;
+
+          if (p.y >= floorY) {
+            p.y = floorY;
+            p.vy = 0;
+            p.vx = 0;
+            p.vRot = 0;
+            p.settled = true;
+          }
+        }
+
+        // Draw petal shape
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = p.settled ? 0.92 : 0.85;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, p.size * 0.65, p.size * 0.36, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        activePetals.push(p);
+      }
+
+      petalsRef.current = activePetals;
+      animId = window.requestAnimationFrame(tick);
+    };
+
+    animId = window.requestAnimationFrame(tick);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      window.cancelAnimationFrame(animId);
+    };
+  }, [unlocked]);
+
+  const sweepPetalsAt = useCallback((clientX: number, clientY: number) => {
+    const brushRadius = 68;
+    let clearedNow = 0;
+
+    petalsRef.current = petalsRef.current.filter((p) => {
+      const dx = p.x - clientX;
+      const dy = p.y - clientY;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= brushRadius) {
+        clearedNow += 1;
+        return false;
+      }
+      return true;
+    });
+
+    if (clearedNow > 0) {
+      setSweptCount((c) => c + clearedNow);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!draggingBrush) return;
+
+    const onMove = (e: PointerEvent) => {
+      setBrushPos({ x: e.clientX, y: e.clientY });
+      sweepPetalsAt(e.clientX, e.clientY);
+    };
+
+    const onUp = () => {
+      draggingBrushRef.current = false;
+      setDraggingBrush(false);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [draggingBrush, sweepPetalsAt]);
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,16 +395,6 @@ export default function SweetieAIPage() {
     }
   };
 
-  const handleLock = () => {
-    stopSpeaking();
-    setUnlocked(false);
-    try {
-      sessionStorage.removeItem(UNLOCK_SESSION_KEY);
-    } catch {
-      // Ignored
-    }
-  };
-
   const stopSpeaking = useCallback(() => {
     speakSessionRef.current += 1;
     setSpeakingMessageId(null);
@@ -213,10 +407,16 @@ export default function SweetieAIPage() {
     }
   }, []);
 
-  /**
-   * Speaks each word clearly with human-like expression & per-word Hindi/English voice tuning
-   * and zero long punctuation pauses.
-   */
+  const handleLock = () => {
+    stopSpeaking();
+    setUnlocked(false);
+    try {
+      sessionStorage.removeItem(UNLOCK_SESSION_KEY);
+    } catch {
+      // Ignored
+    }
+  };
+
   const speakMessage = useCallback(
     (messageId: string, rawText: string) => {
       if (speakingMessageId === messageId) {
@@ -231,12 +431,13 @@ export default function SweetieAIPage() {
       const stripped = sanitizeForSpeech(rawText);
       if (!stripped) return;
 
-      const words = stripped.split(/\s+/).filter(Boolean);
-      if (words.length === 0) return;
+      const baseWords = stripped.split(/\s+/).filter(Boolean);
+      if (baseWords.length === 0) return;
 
       const mood = detectEmotionMood(stripped);
       setActiveMood(mood);
 
+      const spokenStream = buildExhalationWordStream(baseWords, mood);
       const sessionId = speakSessionRef.current + 1;
       speakSessionRef.current = sessionId;
 
@@ -266,53 +467,53 @@ export default function SweetieAIPage() {
         voices.find((v) => v.lang.toLowerCase().startsWith("en")) ||
         null;
 
-      let basePitch = 1.32;
-      let baseRate = 1.04;
-      let baseVolume = 0.88;
+      let basePitch = 1.36;
+      let baseRate = 1.03;
+      let baseVolume = 0.86;
 
       if (mood === "laugh") {
-        basePitch = 1.4;
-        baseRate = 1.1;
-        baseVolume = 0.94;
+        basePitch = 1.44;
+        baseRate = 1.09;
+        baseVolume = 0.92;
       } else if (mood === "attitude") {
-        basePitch = 1.35;
-        baseRate = 1.06;
-        baseVolume = 0.9;
-      } else if (mood === "cry") {
-        basePitch = 1.24;
-        baseRate = 0.94;
-        baseVolume = 0.82;
-      } else if (mood === "emotional") {
-        basePitch = 1.34;
-        baseRate = 1.0;
+        basePitch = 1.38;
+        baseRate = 1.05;
         baseVolume = 0.88;
+      } else if (mood === "cry") {
+        basePitch = 1.28;
+        baseRate = 0.92;
+        baseVolume = 0.8;
+      } else if (mood === "emotional") {
+        basePitch = 1.37;
+        baseRate = 0.99;
+        baseVolume = 0.86;
       } else if (mood === "calm") {
-        basePitch = 1.22;
-        baseRate = 0.98;
-        baseVolume = 0.82;
+        basePitch = 1.25;
+        baseRate = 0.96;
+        baseVolume = 0.8;
       }
 
       setSpeakingMessageId(messageId);
 
       const speakWordAt = (idx: number) => {
         if (speakSessionRef.current !== sessionId) return;
-        if (idx >= words.length) {
+        if (idx >= spokenStream.length) {
           setSpeakingMessageId(null);
           return;
         }
 
-        const rawWord = words[idx];
+        const rawWord = spokenStream[idx];
+        const isExhale = /^(ahhh|haaah|phewww|hmmph|hehe)\.{3}$/i.test(rawWord);
         const wordIsHindi = isHindiWord(rawWord);
-        const spokenWord = wordIsHindi
+        const spokenWord = isExhale
+          ? rawWord.replace(/\./g, "")
+          : wordIsHindi
           ? clarifyWordPhonetics(rawWord)
           : rawWord.replace(/[^\w'-]/g, "") || rawWord;
 
-        // Subtle expressive pitch/rate wave on every word
-        const wave = Math.sin(idx * 0.85) * 0.06;
-        const emphasis =
-          /[!?]/.test(rawWord) || rawWord.length > 6 ? 0.05 : 0;
-
+        const wave = Math.sin(idx * 0.9) * 0.06;
         const utterance = new SpeechSynthesisUtterance(spokenWord);
+
         if (wordIsHindi) {
           utterance.lang = hindiVoice?.lang || "hi-IN";
           if (hindiVoice) utterance.voice = hindiVoice;
@@ -321,16 +522,20 @@ export default function SweetieAIPage() {
           if (englishVoice) utterance.voice = englishVoice;
         }
 
-        utterance.pitch = Math.min(2, Math.max(0.6, basePitch + wave + emphasis));
-        utterance.rate = Math.min(1.6, Math.max(0.75, baseRate + wave * 0.5));
-        utterance.volume = baseVolume;
+        if (isExhale) {
+          utterance.pitch = Math.min(2, basePitch + 0.08);
+          utterance.rate = 0.86;
+          utterance.volume = Math.max(0.55, baseVolume - 0.14);
+        } else {
+          utterance.pitch = Math.min(2, Math.max(0.65, basePitch + wave));
+          utterance.rate = Math.min(1.6, Math.max(0.78, baseRate + wave * 0.4));
+          utterance.volume = baseVolume;
+        }
 
         utterance.onend = () => {
           if (speakSessionRef.current !== sessionId) return;
-          // Crisp, quick human word-to-word gap (no slow punctuation drag)
-          const endsSentence = /[.!?।]$/.test(rawWord);
-          const pauseMs = endsSentence ? 55 : 20;
-          setTimeout(() => speakWordAt(idx + 1), pauseMs);
+          const delay = isExhale ? 45 : 18;
+          setTimeout(() => speakWordAt(idx + 1), delay);
         };
 
         utterance.onerror = () => {
@@ -391,7 +596,7 @@ export default function SweetieAIPage() {
           body: JSON.stringify({
             visitorName,
             styleHint:
-              "Be funny, cute, expressive with emojis, and have a tiny playful attitude. Do not bring up Free Fire unless asked.",
+              "Be extra charming, funny, cute, expressive with emojis, and have a playful little attitude. Do not bring up Free Fire unless asked.",
             messages: filteredHistory.map((m) => ({
               role: m.role,
               content: m.content,
@@ -448,8 +653,8 @@ export default function SweetieAIPage() {
         id: "welcome",
         role: "assistant",
         content: saved
-          ? `Heyyy ${saved}! 😏🌸 Sweetie is here with cute attitude & clear Hindi/English voice. Tap Speak on any reply whenever you want to hear me!`
-          : "Heyyy cutie! 😏🌸 I'm Sweetie—funny, expressive, and a little sassy. Replies appear in text first; tap Speak on any message to hear every word clearly!",
+          ? `Heyyy ${saved}! 😏💖 Sweetie is glowing with cute attitude today 🌸 Drag the brush at the bottom to sweep fallen petals, or tap Speak to hear my soft voice!`
+          : "Heyyy cutie! 😏💖 I'm Sweetie—cute, funny, and a little sassy. Drag the brush to sweep the petal pile at the bottom, or tap Speak on any reply! ✨🌸",
         time: getTimeNow(),
       },
     ]);
@@ -591,13 +796,12 @@ export default function SweetieAIPage() {
         id: `reset-${Date.now()}`,
         role: "assistant",
         content:
-          "Okay fine, fresh slate! 😏🌸 Cute & sassy mode is ready whenever you are ✨",
+          "Okay fine, fresh slate! 😏💖 Cute & sassy mode is ready whenever you are ✨🌸",
         time: getTimeNow(),
       },
     ]);
   };
 
-  // Password Gate Screen
   if (!unlocked) {
     return (
       <div className="max-w-md mx-auto py-12 animate-fade-up">
@@ -658,23 +862,44 @@ export default function SweetieAIPage() {
   const isChatAnimated = holdingMic || speakingNow;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4 animate-fade-up">
+    <div className="relative max-w-3xl mx-auto space-y-4 animate-fade-up">
+      {/* Gravity Falling & Bottom-Collected Petals Canvas */}
+      <canvas
+        ref={canvasRef}
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-20"
+      />
+
+      {/* Floating Brush While Dragging */}
+      {draggingBrush && brushPos && (
+        <div
+          style={{ left: brushPos.x - 24, top: brushPos.y - 24 }}
+          aria-hidden="true"
+          className="pointer-events-none fixed z-40 w-12 h-12 rounded-full bg-rose-500/20 border-2 border-rose-400 flex items-center justify-center text-rose-600 shadow-lg"
+        >
+          <Brush size={22} />
+        </div>
+      )}
+
       {/* Header */}
-      <div className="rounded-3xl px-5 py-4 bg-white/95 border border-rose-200/80 shadow-md flex flex-wrap items-center justify-between gap-3">
+      <div className="relative z-30 rounded-3xl px-5 py-4 bg-gradient-to-r from-rose-50/95 via-white/95 to-pink-50/95 border border-rose-200 shadow-lg flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
-            className={`w-11 h-11 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-500 text-white flex items-center justify-center shadow-md transition-transform duration-300 ${
+            className={`w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-500 via-pink-500 to-amber-400 text-white flex items-center justify-center shadow-md transition-transform duration-300 ${
               speakingNow ? "scale-110 animate-bounce" : ""
             }`}
           >
             <Cog size={22} />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900">
-              Sweetie🌸
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-xl sm:text-2xl font-heading font-bold text-slate-900">
+                Sweetie🌸
+              </h1>
+              <Sparkles size={16} className="text-rose-500" />
+            </div>
             <p className="text-xs text-slate-600">
-              Clear Hindi/English voice • Vibe:{" "}
+              Soft baby voice + exhale • Mood:{" "}
               <span className="font-mono font-bold text-rose-600">
                 {speakingNow ? `${activeMood} (speaking)` : activeMood}
               </span>
@@ -683,6 +908,30 @@ export default function SweetieAIPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Draggable Petal-Sweeping Brush Handle */}
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              draggingBrushRef.current = true;
+              setDraggingBrush(true);
+              setBrushPos({ x: e.clientX, y: e.clientY });
+              sweepPetalsAt(e.clientX, e.clientY);
+            }}
+            title="Drag across bottom petals to sweep them clean"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border text-xs font-mono font-bold select-none touch-none cursor-grab active:cursor-grabbing transition-all ${
+              draggingBrush
+                ? "bg-rose-500 border-rose-500 text-white scale-105 shadow-md"
+                : "bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900"
+            }`}
+          >
+            <Brush size={13} />
+            <span>{draggingBrush ? "Sweeping..." : "Drag Brush"}</span>
+            {sweptCount > 0 && (
+              <span className="text-[10px] opacity-80">({sweptCount})</span>
+            )}
+          </button>
+
           {editingName ? (
             <form onSubmit={handleSaveName} className="flex items-center gap-1.5">
               <input
@@ -730,12 +979,12 @@ export default function SweetieAIPage() {
         </div>
       </div>
 
-      {/* Entire AI Chat Box — Animates smoothly while holding mic OR speaking */}
+      {/* Main AI Chat Box */}
       <div
-        className={`rounded-[2rem] bg-white/95 border shadow-xl overflow-hidden flex flex-col h-[66vh] min-h-[440px] transition-all duration-300 ${
+        className={`relative z-30 rounded-[2rem] bg-white/95 border shadow-xl overflow-hidden flex flex-col h-[64vh] min-h-[430px] transition-all duration-300 ${
           isChatAnimated
             ? "border-rose-400 ring-4 ring-rose-400/35 shadow-[0_0_40px_rgba(244,63,94,0.28)] scale-[1.01] animate-pulse"
-            : "border-slate-200"
+            : "border-rose-200/80"
         }`}
       >
         {holdingMic && (
@@ -747,7 +996,7 @@ export default function SweetieAIPage() {
 
         {!holdingMic && speakingNow && (
           <div className="px-4 py-2 bg-gradient-to-r from-pink-500 via-rose-400 to-amber-400 text-white text-xs font-mono font-bold flex items-center justify-between animate-pulse">
-            <span>Sweetie is speaking every word ({activeMood})...</span>
+            <span>Sweetie is speaking with cute exhales ({activeMood})...</span>
             <button
               type="button"
               onClick={stopSpeaking}
@@ -758,7 +1007,7 @@ export default function SweetieAIPage() {
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gradient-to-b from-rose-50/30 via-white to-pink-50/30">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 bg-gradient-to-b from-rose-50/40 via-white to-pink-50/40">
           {messages.map((msg) => {
             const isUser = msg.role === "user";
             const isThisSpeaking = speakingMessageId === msg.id;
@@ -784,7 +1033,7 @@ export default function SweetieAIPage() {
                   className={`max-w-[82%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
                     isUser
                       ? "rounded-3xl rounded-br-md bg-slate-900 text-white shadow-md"
-                      : "rounded-3xl rounded-bl-md bg-white border border-slate-200 text-slate-800 shadow-sm"
+                      : "rounded-3xl rounded-bl-md bg-white border border-rose-100 text-slate-800 shadow-sm"
                   }`}
                 >
                   <div>{msg.content}</div>
