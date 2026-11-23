@@ -69,9 +69,11 @@ interface Petal {
 
 interface ActiveUserSession {
   userId: string;
+  sessionId: string;
   name: string;
   email: string;
   createdAt?: string;
+  loginAt: string;
   method: "google";
 }
 
@@ -84,9 +86,20 @@ interface RegisteredUserRecord {
   total_seconds_spent: number;
 }
 
-const USER_AUTH_KEY = "sweetie_ai_user_session_v3";
+interface LoginSessionRecord {
+  session_id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  login_at: string;
+  last_active_at: string;
+  duration_seconds: number;
+}
+
+const USER_AUTH_KEY = "sweetie_ai_user_session_v4";
 const QUESTION_BACKUP_KEY = "sweetie_stored_questions_v1";
 const USERS_BACKUP_KEY = "sweetie_registered_users_v2";
+const SESSIONS_BACKUP_KEY = "sweetie_login_sessions_v1";
 const NAME_KEY = "sweetie_visitor_name";
 
 const PETAL_PALETTE = [
@@ -367,11 +380,13 @@ async function storeUserQuestionRecord(params: {
   }
 }
 
-async function syncUserProfileAndTime(params: {
+async function syncUserProfileAndSession(params: {
   userId: string;
+  sessionId: string;
   userName: string;
   userEmail: string;
   accountCreatedAt?: string;
+  loginAt: string;
   addSeconds?: number;
   preserveLastLogin?: boolean;
 }) {
@@ -379,56 +394,114 @@ async function syncUserProfileAndTime(params: {
   const addedSecs = Math.max(0, Math.floor(params.addSeconds ?? 0));
 
   let existingCreatedAt = params.accountCreatedAt || nowIso;
-  let existingLastLoginAt = nowIso;
-  let existingSeconds = 0;
+  let existingLastLoginAt = params.loginAt || nowIso;
+  let existingTotalSeconds = 0;
+  let existingSessionSeconds = 0;
 
   try {
-    const raw = localStorage.getItem(USERS_BACKUP_KEY);
-    const list = raw ? (JSON.parse(raw) as RegisteredUserRecord[]) : [];
-    const found = list.find((u) => u.user_id === params.userId);
-    if (found) {
-      if (found.created_at) existingCreatedAt = found.created_at;
-      if (found.last_login_at) existingLastLoginAt = found.last_login_at;
-      existingSeconds = Number(found.total_seconds_spent || 0);
+    const rawU = localStorage.getItem(USERS_BACKUP_KEY);
+    const uList = rawU ? (JSON.parse(rawU) as RegisteredUserRecord[]) : [];
+    const foundU = uList.find((u) => u.user_id === params.userId);
+    if (foundU) {
+      if (foundU.created_at) existingCreatedAt = foundU.created_at;
+      if (foundU.last_login_at) existingLastLoginAt = foundU.last_login_at;
+      existingTotalSeconds = Number(foundU.total_seconds_spent || 0);
     }
   } catch {
     // Ignored
   }
 
   try {
-    const { data: remoteRow } = await supabase
+    const rawS = localStorage.getItem(SESSIONS_BACKUP_KEY);
+    const sList = rawS ? (JSON.parse(rawS) as LoginSessionRecord[]) : [];
+    const foundS = sList.find((s) => s.session_id === params.sessionId);
+    if (foundS) {
+      existingSessionSeconds = Number(foundS.duration_seconds || 0);
+    }
+  } catch {
+    // Ignored
+  }
+
+  try {
+    const { data: remoteUser } = await supabase
       .from("sweetie_users")
       .select("created_at, last_login_at, total_seconds_spent")
       .eq("user_id", params.userId)
       .maybeSingle();
 
-    if (remoteRow) {
-      if (remoteRow.created_at) existingCreatedAt = String(remoteRow.created_at);
-      if (remoteRow.last_login_at)
-        existingLastLoginAt = String(remoteRow.last_login_at);
-      existingSeconds = Math.max(
-        existingSeconds,
-        Number(remoteRow.total_seconds_spent || 0)
+    if (remoteUser) {
+      if (remoteUser.created_at)
+        existingCreatedAt = String(remoteUser.created_at);
+      if (remoteUser.last_login_at)
+        existingLastLoginAt = String(remoteUser.last_login_at);
+      existingTotalSeconds = Math.max(
+        existingTotalSeconds,
+        Number(remoteUser.total_seconds_spent || 0)
       );
     }
   } catch {
     // Ignored
   }
 
-  const record: RegisteredUserRecord = {
+  try {
+    const { data: remoteSession } = await supabase
+      .from("sweetie_user_sessions")
+      .select("duration_seconds")
+      .eq("session_id", params.sessionId)
+      .maybeSingle();
+
+    if (remoteSession) {
+      existingSessionSeconds = Math.max(
+        existingSessionSeconds,
+        Number(remoteSession.duration_seconds || 0)
+      );
+    }
+  } catch {
+    // Ignored
+  }
+
+  const nextTotalSeconds = existingTotalSeconds + addedSecs;
+  const nextSessionSeconds = existingSessionSeconds + addedSecs;
+
+  const userRecord: RegisteredUserRecord = {
     user_id: params.userId,
     user_name: params.userName,
     user_email: params.userEmail,
     created_at: existingCreatedAt,
-    last_login_at: params.preserveLastLogin ? existingLastLoginAt : nowIso,
-    total_seconds_spent: existingSeconds + addedSecs,
+    last_login_at: params.preserveLastLogin ? existingLastLoginAt : params.loginAt,
+    total_seconds_spent: nextTotalSeconds,
+  };
+
+  const sessionRecord: LoginSessionRecord = {
+    session_id: params.sessionId,
+    user_id: params.userId,
+    user_name: params.userName,
+    user_email: params.userEmail,
+    login_at: params.loginAt,
+    last_active_at: nowIso,
+    duration_seconds: nextSessionSeconds,
   };
 
   try {
-    const raw = localStorage.getItem(USERS_BACKUP_KEY);
-    const list = raw ? (JSON.parse(raw) as RegisteredUserRecord[]) : [];
-    const next = [record, ...list.filter((u) => u.user_id !== params.userId)];
-    localStorage.setItem(USERS_BACKUP_KEY, JSON.stringify(next));
+    const rawU = localStorage.getItem(USERS_BACKUP_KEY);
+    const uList = rawU ? (JSON.parse(rawU) as RegisteredUserRecord[]) : [];
+    const nextU = [
+      userRecord,
+      ...uList.filter((u) => u.user_id !== params.userId),
+    ];
+    localStorage.setItem(USERS_BACKUP_KEY, JSON.stringify(nextU));
+  } catch {
+    // Ignored
+  }
+
+  try {
+    const rawS = localStorage.getItem(SESSIONS_BACKUP_KEY);
+    const sList = rawS ? (JSON.parse(rawS) as LoginSessionRecord[]) : [];
+    const nextS = [
+      sessionRecord,
+      ...sList.filter((s) => s.session_id !== params.sessionId),
+    ].slice(0, 300);
+    localStorage.setItem(SESSIONS_BACKUP_KEY, JSON.stringify(nextS));
   } catch {
     // Ignored
   }
@@ -436,7 +509,15 @@ async function syncUserProfileAndTime(params: {
   try {
     await supabase
       .from("sweetie_users")
-      .upsert(record, { onConflict: "user_id" });
+      .upsert(userRecord, { onConflict: "user_id" });
+  } catch {
+    // Ignored
+  }
+
+  try {
+    await supabase
+      .from("sweetie_user_sessions")
+      .upsert(sessionRecord, { onConflict: "session_id" });
   } catch {
     // Ignored
   }
@@ -470,6 +551,7 @@ export default function SweetieAIPage() {
   const recognitionRef = useRef<SpeechRecognizerLike | null>(null);
   const holdingRef = useRef(false);
   const speakSessionRef = useRef(0);
+  const activeSessionIdRef = useRef<string | null>(null);
 
   const hydrateUserSession = useCallback(
     async (
@@ -479,7 +561,9 @@ export default function SweetieAIPage() {
         created_at?: string;
         user_metadata?: Record<string, unknown>;
       },
-      isFreshLogin = true
+      isFreshLogin = true,
+      existingSessionId?: string,
+      existingLoginAt?: string
     ) => {
       const email = user.email || "";
       if (!email) return;
@@ -491,11 +575,28 @@ export default function SweetieAIPage() {
         email.split("@")[0];
 
       const userId = user.id || email;
+      const nowIso = new Date().toISOString();
+
+      const sessionId =
+        !isFreshLogin && existingSessionId
+          ? existingSessionId
+          : activeSessionIdRef.current && !isFreshLogin
+          ? activeSessionIdRef.current
+          : `sess_${userId}_${Date.now()}_${Math.random()
+              .toString(36)
+              .slice(2, 7)}`;
+
+      activeSessionIdRef.current = sessionId;
+      const loginAt =
+        !isFreshLogin && existingLoginAt ? existingLoginAt : nowIso;
+
       const sess: ActiveUserSession = {
         userId,
+        sessionId,
         name: derivedGoogleName,
         email,
         createdAt: user.created_at,
+        loginAt,
         method: "google",
       };
 
@@ -504,11 +605,13 @@ export default function SweetieAIPage() {
       setNameInput(derivedGoogleName);
       setAuthError("");
 
-      void syncUserProfileAndTime({
+      void syncUserProfileAndSession({
         userId,
+        sessionId,
         userName: derivedGoogleName,
         userEmail: email,
         accountCreatedAt: user.created_at,
+        loginAt,
         preserveLastLogin: !isFreshLogin,
       });
 
@@ -575,7 +678,7 @@ export default function SweetieAIPage() {
 
       const handle = formatAtUsername(derivedGoogleName);
       const welcomeNote: Message = {
-        id: `welcome-${userId}`,
+        id: `welcome-${sessionId}`,
         role: "assistant",
         content:
           pastMessages.length > 0
@@ -607,7 +710,9 @@ export default function SweetieAIPage() {
               created_at: parsed.createdAt,
               user_metadata: { full_name: parsed.name },
             },
-            false
+            false,
+            parsed.sessionId,
+            parsed.loginAt
           );
         }
       }
@@ -617,7 +722,11 @@ export default function SweetieAIPage() {
 
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
-        void hydrateUserSession(data.user, !restoredFromSession);
+        void hydrateUserSession(
+          data.user,
+          !restoredFromSession,
+          activeSessionIdRef.current || undefined
+        );
       }
     });
 
@@ -625,9 +734,11 @@ export default function SweetieAIPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
+        const isNewLogin = event === "SIGNED_IN" && !restoredFromSession;
         void hydrateUserSession(
           session.user,
-          event === "SIGNED_IN" || event === "USER_UPDATED"
+          isNewLogin,
+          activeSessionIdRef.current || undefined
         );
       }
     });
@@ -635,7 +746,7 @@ export default function SweetieAIPage() {
     return () => subscription.unsubscribe();
   }, [hydrateUserSession]);
 
-  // Track active seconds spent on the website while logged in and visible
+  // Track active seconds spent on the website for this specific login session
   useEffect(() => {
     if (!userSession) return;
 
@@ -645,11 +756,13 @@ export default function SweetieAIPage() {
       if (unsyncedSeconds <= 0) return;
       const secsToSave = unsyncedSeconds;
       unsyncedSeconds = 0;
-      void syncUserProfileAndTime({
+      void syncUserProfileAndSession({
         userId: userSession.userId,
+        sessionId: userSession.sessionId,
         userName: visitorName || userSession.name,
         userEmail: userSession.email,
         accountCreatedAt: userSession.createdAt,
+        loginAt: userSession.loginAt,
         addSeconds: secsToSave,
         preserveLastLogin: true,
       });
@@ -804,6 +917,7 @@ export default function SweetieAIPage() {
   };
 
   const handleLogout = async () => {
+    activeSessionIdRef.current = null;
     setUserSession(null);
     setAuthBusy(false);
     try {
