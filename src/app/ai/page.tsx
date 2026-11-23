@@ -76,6 +76,7 @@ interface ActiveUserSession {
 
 const USER_AUTH_KEY = "sweetie_ai_user_session_v3";
 const QUESTION_BACKUP_KEY = "sweetie_stored_questions_v1";
+const USERS_BACKUP_KEY = "sweetie_registered_users_v1";
 const NAME_KEY = "sweetie_visitor_name";
 
 const PETAL_PALETTE = [
@@ -356,6 +357,61 @@ async function storeUserQuestionRecord(params: {
   }
 }
 
+async function recordUserLoginActivity(params: {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  accountCreatedAt?: string;
+}) {
+  const nowIso = new Date().toISOString();
+  const createdIso = params.accountCreatedAt || nowIso;
+
+  try {
+    const raw = localStorage.getItem(USERS_BACKUP_KEY);
+    const list = raw
+      ? (JSON.parse(raw) as Array<{
+          user_id: string;
+          user_name: string;
+          user_email: string;
+          created_at: string;
+          last_login_at: string;
+        }>)
+      : [];
+
+    const existing = list.find((u) => u.user_id === params.userId);
+    const updated = {
+      user_id: params.userId,
+      user_name: params.userName,
+      user_email: params.userEmail,
+      created_at: existing?.created_at || createdIso,
+      last_login_at: nowIso,
+    };
+
+    const next = [
+      updated,
+      ...list.filter((u) => u.user_id !== params.userId),
+    ];
+    localStorage.setItem(USERS_BACKUP_KEY, JSON.stringify(next));
+  } catch {
+    // Ignored
+  }
+
+  try {
+    await supabase.from("sweetie_users").upsert(
+      {
+        user_id: params.userId,
+        user_name: params.userName,
+        user_email: params.userEmail,
+        created_at: createdIso,
+        last_login_at: nowIso,
+      },
+      { onConflict: "user_id" }
+    );
+  } catch {
+    // Ignored
+  }
+}
+
 export default function SweetieAIPage() {
   const [userSession, setUserSession] = useState<ActiveUserSession | null>(
     null
@@ -389,6 +445,7 @@ export default function SweetieAIPage() {
     async (user: {
       id?: string;
       email?: string | null;
+      created_at?: string;
       user_metadata?: Record<string, unknown>;
     }) => {
       const email = user.email || "";
@@ -413,6 +470,13 @@ export default function SweetieAIPage() {
       setNameInput(derivedGoogleName);
       setAuthError("");
 
+      void recordUserLoginActivity({
+        userId,
+        userName: derivedGoogleName,
+        userEmail: email,
+        accountCreatedAt: user.created_at,
+      });
+
       try {
         sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
         localStorage.setItem(NAME_KEY, derivedGoogleName);
@@ -420,7 +484,6 @@ export default function SweetieAIPage() {
         // Ignored
       }
 
-      // Load past saved messages across days, weeks, or years for this user only
       let pastMessages = loadSavedUserMessages(userId);
 
       try {
@@ -500,7 +563,7 @@ export default function SweetieAIPage() {
       if (savedSession) {
         const parsed = JSON.parse(savedSession) as ActiveUserSession;
         if (parsed?.email) {
-          hydrateUserSession({
+          void hydrateUserSession({
             id: parsed.userId,
             email: parsed.email,
             user_metadata: { full_name: parsed.name },
@@ -513,7 +576,7 @@ export default function SweetieAIPage() {
 
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
-        hydrateUserSession(data.user);
+        void hydrateUserSession(data.user);
       }
     });
 
@@ -521,7 +584,7 @@ export default function SweetieAIPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        hydrateUserSession(session.user);
+        void hydrateUserSession(session.user);
       }
     });
 
