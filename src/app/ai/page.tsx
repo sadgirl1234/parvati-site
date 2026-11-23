@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Send,
-  Trash2,
   Copy,
   Check,
   User,
@@ -75,7 +74,7 @@ interface ActiveUserSession {
   method: "google";
 }
 
-const USER_AUTH_KEY = "sweetie_ai_user_session_v2";
+const USER_AUTH_KEY = "sweetie_ai_user_session_v3";
 const QUESTION_BACKUP_KEY = "sweetie_stored_questions_v1";
 const NAME_KEY = "sweetie_visitor_name";
 
@@ -130,9 +129,43 @@ function getTimeNow() {
   }).format(new Date());
 }
 
-function formatHandle(name: string): string {
+function formatAtUsername(name: string): string {
   const cleaned = name.trim().replace(/\s+/g, "");
   return cleaned ? `@${cleaned}` : "@cutie";
+}
+
+function getUserChatStorageKey(userId: string): string {
+  return `sweetie_permanent_chat_${encodeURIComponent(userId)}`;
+}
+
+function loadSavedUserMessages(userId: string): Message[] {
+  try {
+    const raw = localStorage.getItem(getUserChatStorageKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (m): m is Message =>
+          typeof m === "object" &&
+          m !== null &&
+          typeof (m as Message).id === "string" &&
+          ((m as Message).role === "user" ||
+            (m as Message).role === "assistant") &&
+          typeof (m as Message).content === "string"
+      );
+    }
+  } catch {
+    // Ignored
+  }
+  return [];
+}
+
+function savePermanentUserMessages(userId: string, list: Message[]) {
+  try {
+    localStorage.setItem(getUserChatStorageKey(userId), JSON.stringify(list));
+  } catch {
+    // Ignored
+  }
 }
 
 function sanitizeForSpeech(raw: string): string {
@@ -293,6 +326,7 @@ async function storeUserQuestionRecord(params: {
   authMethod: "google";
   question: string;
   aiReply: string;
+  fullConversation: Message[];
 }) {
   const nowIso = new Date().toISOString();
   const record = {
@@ -302,13 +336,14 @@ async function storeUserQuestionRecord(params: {
     auth_method: params.authMethod,
     question: params.question,
     ai_reply: params.aiReply,
+    conversation_json: params.fullConversation,
     created_at: nowIso,
   };
 
   try {
     const existingRaw = localStorage.getItem(QUESTION_BACKUP_KEY);
     const existing = existingRaw ? (JSON.parse(existingRaw) as unknown[]) : [];
-    const next = [{ id: Date.now(), ...record }, ...existing].slice(0, 150);
+    const next = [{ id: Date.now(), ...record }, ...existing].slice(0, 200);
     localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(next));
   } catch {
     // Ignored
@@ -350,8 +385,8 @@ export default function SweetieAIPage() {
   const holdingRef = useRef(false);
   const speakSessionRef = useRef(0);
 
-  const applyAuthenticatedUser = useCallback(
-    (user: {
+  const hydrateUserSession = useCallback(
+    async (user: {
       id?: string;
       email?: string | null;
       user_metadata?: Record<string, unknown>;
@@ -360,39 +395,101 @@ export default function SweetieAIPage() {
       if (!email) return;
 
       const meta = user.user_metadata || {};
-      const rawName =
-        (typeof meta.full_name === "string" && meta.full_name) ||
-        (typeof meta.name === "string" && meta.name) ||
-        email.split("@")[0] ||
-        "User";
+      const derivedGoogleName =
+        (typeof meta.full_name === "string" && meta.full_name.trim()) ||
+        (typeof meta.name === "string" && meta.name.trim()) ||
+        email.split("@")[0];
 
+      const userId = user.id || email;
       const sess: ActiveUserSession = {
-        userId: user.id || email,
-        name: rawName.trim(),
+        userId,
+        name: derivedGoogleName,
         email,
         method: "google",
       };
 
       setUserSession(sess);
-      setVisitorName(sess.name);
-      setNameInput(sess.name);
+      setVisitorName(derivedGoogleName);
+      setNameInput(derivedGoogleName);
       setAuthError("");
 
       try {
         sessionStorage.setItem(USER_AUTH_KEY, JSON.stringify(sess));
-        localStorage.setItem(NAME_KEY, sess.name);
+        localStorage.setItem(NAME_KEY, derivedGoogleName);
       } catch {
         // Ignored
       }
 
-      setMessages([
-        {
-          id: `welcome-${Date.now()}`,
-          role: "assistant",
-          content: `Welcome ${formatHandle(sess.name)}! 😏💖 Sweetie just noticed you logged in (${sess.name} • ${sess.email}) 🌸 Tap Speak on any reply whenever you want to hear my soft voice! ✨`,
-          time: getTimeNow(),
-        },
-      ]);
+      // Load past saved messages across days, weeks, or years for this user only
+      let pastMessages = loadSavedUserMessages(userId);
+
+      try {
+        const { data } = await supabase
+          .from("sweetie_user_questions")
+          .select("question, ai_reply, conversation_json, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        if (data && data.length > 0) {
+          const newestWithConvo = data.find(
+            (row) =>
+              Array.isArray(row.conversation_json) &&
+              (row.conversation_json as Message[]).length > 0
+          );
+          if (newestWithConvo) {
+            const remoteConvo = newestWithConvo.conversation_json as Message[];
+            if (remoteConvo.length >= pastMessages.length) {
+              pastMessages = remoteConvo;
+            }
+          } else if (pastMessages.length === 0) {
+            const rebuilt: Message[] = [];
+            [...data].reverse().forEach((row, idx) => {
+              const stamp = new Date(row.created_at).toLocaleString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              if (row.question) {
+                rebuilt.push({
+                  id: `hist-u-${idx}-${row.created_at}`,
+                  role: "user",
+                  content: row.question,
+                  time: stamp,
+                });
+              }
+              if (row.ai_reply) {
+                rebuilt.push({
+                  id: `hist-a-${idx}-${row.created_at}`,
+                  role: "assistant",
+                  content: row.ai_reply,
+                  time: stamp,
+                });
+              }
+            });
+            pastMessages = rebuilt;
+          }
+        }
+      } catch {
+        // Ignored
+      }
+
+      const handle = formatAtUsername(derivedGoogleName);
+      const welcomeNote: Message = {
+        id: `welcome-${userId}`,
+        role: "assistant",
+        content:
+          pastMessages.length > 0
+            ? `Welcome ${handle}! 😏💖 Sweetie remembers all our old chats with you (${derivedGoogleName}) 🌸 Tap Speak on any reply whenever you want to hear my soft voice! ✨`
+            : `Welcome ${handle}! 😏💖 Sweetie is here for you (${derivedGoogleName}) with cute attitude and warm vibes 🌸 Tap Speak on any reply to hear my soft voice! ✨`,
+        time: getTimeNow(),
+      };
+
+      const combined =
+        pastMessages.length > 0 ? [...pastMessages, welcomeNote] : [welcomeNote];
+      setMessages(combined);
+      savePermanentUserMessages(userId, combined);
     },
     []
   );
@@ -403,17 +500,11 @@ export default function SweetieAIPage() {
       if (savedSession) {
         const parsed = JSON.parse(savedSession) as ActiveUserSession;
         if (parsed?.email) {
-          setUserSession(parsed);
-          setVisitorName(parsed.name);
-          setNameInput(parsed.name);
-          setMessages([
-            {
-              id: `welcome-restored-${Date.now()}`,
-              role: "assistant",
-              content: `Welcome ${formatHandle(parsed.name)}! 😏💖 Sweetie is ready for you (${parsed.name} • ${parsed.email}) 🌸 Tap Speak on any reply to hear my soft voice! ✨`,
-              time: getTimeNow(),
-            },
-          ]);
+          hydrateUserSession({
+            id: parsed.userId,
+            email: parsed.email,
+            user_metadata: { full_name: parsed.name },
+          });
         }
       }
     } catch {
@@ -422,7 +513,7 @@ export default function SweetieAIPage() {
 
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
-        applyAuthenticatedUser(data.user);
+        hydrateUserSession(data.user);
       }
     });
 
@@ -430,12 +521,12 @@ export default function SweetieAIPage() {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
-        applyAuthenticatedUser(session.user);
+        hydrateUserSession(session.user);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [applyAuthenticatedUser]);
+  }, [hydrateUserSession]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -730,6 +821,7 @@ export default function SweetieAIPage() {
       stopSpeaking();
 
       const activeName = visitorName.trim() || userSession.name;
+      const handle = formatAtUsername(activeName);
 
       const userMsg: Message = {
         id: `u-${Date.now()}`,
@@ -740,6 +832,7 @@ export default function SweetieAIPage() {
 
       const nextMessages = [...currentHistory, userMsg];
       setMessages(nextMessages);
+      savePermanentUserMessages(userSession.userId, nextMessages);
       setInput("");
       setLoading(true);
 
@@ -767,7 +860,7 @@ export default function SweetieAIPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             visitorName: activeName,
-            styleHint: `The user's name is ${activeName} (${formatHandle(activeName)}). Be extra charming, funny, cute, expressive with emojis, and have a playful little attitude. Do not bring up Free Fire unless asked.`,
+            styleHint: `Address the user only by their name or ${handle} (never say or mention any internal user ID or UUID). Remember past messages in this conversation. Be extra charming, funny, cute, expressive with emojis, and have a playful little attitude. Do not bring up Free Fire unless asked.`,
             messages: filteredHistory.map((m) => ({
               role: m.role,
               content: m.content,
@@ -778,31 +871,22 @@ export default function SweetieAIPage() {
         const data = (await res.json()) as { reply?: string; error?: string };
         finalReply = res.ok
           ? data.reply ??
-            "Hmph, my cute brain blinked for a second! Ask me again 🙄🌸"
+            `Hmph ${handle}, my cute brain blinked for a second! Ask me again 🙄🌸`
           : `⚠️ ${data.error ?? "Failed to reply."}`;
 
-        setMessages((prev) => [
-          ...prev,
+        const updatedWithReply: Message[] = [
+          ...nextMessages,
           {
             id: `a-${Date.now()}`,
             role: "assistant",
             content: finalReply,
             time: getTimeNow(),
           },
-        ]);
-      } catch {
-        finalReply = "Aww, network got sleepy 🙄🌸 Try again in a bit!";
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `err-${Date.now()}`,
-            role: "assistant",
-            content: finalReply,
-            time: getTimeNow(),
-          },
-        ]);
-      } finally {
-        setLoading(false);
+        ];
+
+        setMessages(updatedWithReply);
+        savePermanentUserMessages(userSession.userId, updatedWithReply);
+
         await storeUserQuestionRecord({
           userId: userSession.userId,
           userName: activeName,
@@ -810,7 +894,33 @@ export default function SweetieAIPage() {
           authMethod: userSession.method,
           question: text,
           aiReply: finalReply,
+          fullConversation: updatedWithReply,
         });
+      } catch {
+        finalReply = `Aww ${handle}, network got sleepy 🙄🌸 Try again in a bit!`;
+        const updatedWithErr: Message[] = [
+          ...nextMessages,
+          {
+            id: `err-${Date.now()}`,
+            role: "assistant",
+            content: finalReply,
+            time: getTimeNow(),
+          },
+        ];
+        setMessages(updatedWithErr);
+        savePermanentUserMessages(userSession.userId, updatedWithErr);
+
+        await storeUserQuestionRecord({
+          userId: userSession.userId,
+          userName: activeName,
+          userEmail: userSession.email,
+          authMethod: userSession.method,
+          question: text,
+          aiReply: finalReply,
+          fullConversation: updatedWithErr,
+        });
+      } finally {
+        setLoading(false);
       }
     },
     [loading, stopSpeaking, userSession, visitorName]
@@ -944,20 +1054,6 @@ export default function SweetieAIPage() {
     }
   };
 
-  const handleClear = () => {
-    stopSpeaking();
-    setMicError("");
-    const activeName = visitorName.trim() || userSession?.name || "cutie";
-    setMessages([
-      {
-        id: `reset-${Date.now()}`,
-        role: "assistant",
-        content: `Okay fine ${formatHandle(activeName)}, fresh slate! 😏💖 Cute & sassy mode is ready whenever you are ✨🌸`,
-        time: getTimeNow(),
-      },
-    ]);
-  };
-
   const speakingNow = speakingMessageId !== null;
   const isChatAnimated = holdingMic || speakingNow;
 
@@ -1029,7 +1125,7 @@ export default function SweetieAIPage() {
                   </h1>
                   <p className="text-xs text-slate-700 font-medium">
                     <span className="font-bold text-slate-900">
-                      {userSession.name}
+                      {visitorName || userSession.name}
                     </span>{" "}
                     <span className="text-slate-500">({userSession.email})</span>
                   </p>
@@ -1073,14 +1169,6 @@ export default function SweetieAIPage() {
                     {`Hi, ${visitorName || userSession.name}`}
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-2xl bg-slate-50 hover:bg-rose-50 border border-slate-200 text-xs font-mono font-bold text-slate-700 cursor-pointer"
-                >
-                  <Trash2 size={13} /> Clear
-                </button>
 
                 <button
                   type="button"
