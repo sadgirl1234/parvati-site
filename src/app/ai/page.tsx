@@ -96,22 +96,19 @@ function getTimeNow() {
 }
 
 function sanitizeForSpeech(raw: string): string {
-  return raw
-    .replace(/[\u{1F300}-\u{1FAFF}]/gu, " ")
-    .replace(/[\u{2600}-\u{27BF}]/gu, " ")
-    .replace(/[\u{FE00}-\u{FE0F}]/gu, "")
-    .replace(/[\u{200D}]/gu, "")
-    .replace(
-      /\b(smiling face|blushing|cherry blossom|sparkles|heart|red heart|grinning|laughing|crying|sob|tears|wink|kiss|rolling eyes|eye roll|emoji)\b/gi,
-      " "
-    )
-    .replace(/\*[^*]+\*/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const withoutSurrogatePairs = raw.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, " ");
+  const withoutSymbols = withoutSurrogatePairs.replace(/[\u2600-\u27BF]/g, " ");
+  const withoutSelectors = withoutSymbols.replace(/[\uFE00-\uFE0F\u200D]/g, "");
+  const withoutEmojiLabels = withoutSelectors.replace(
+    /\b(smiling face|blushing|cherry blossom|sparkles|heart|red heart|grinning|laughing|crying|sob|tears|wink|kiss|rolling eyes|eye roll|emoji)\b/gi,
+    " "
+  );
+  const withoutAsterisks = withoutEmojiLabels.replace(/\*[^*]+\*/g, " ");
+  return withoutAsterisks.replace(/\s+/g, " ").trim();
 }
 
 function isHindiWord(word: string): boolean {
-  if (/[\u0900-\u{097F}]/.test(word)) return true;
+  if (/[\u0900-\u097F]/.test(word)) return true;
   return /^(kya|hai|hain|hoon|hu|mera|meri|mere|tum|aap|kaise|kaisi|kyun|kyu|kyon|acha|achha|achchha|batao|sunao|pyaar|dil|yaar|haan|nahi|nhi|nahin|bhai|didi|shukriya|dhanyavaad|khush|udas|rona|hasna|bilkul|zaroor|suno|dekho|chalo|abhi|bahut|thoda|thora|kaun|kahan|kidhar|mat|karo|karna|raha|rahi|rahe|tha|thi|the|ho|toh|aur|lekin|par|se|ko|ka|ki|ke|mein|main|ne)$/i.test(
     word.replace(/[^a-zA-Z\u0900-\u097F]/g, "")
   );
@@ -156,10 +153,6 @@ function detectEmotionMood(text: string): EmotionMood {
   return "smile";
 }
 
-/**
- * Adds soft baby-girl exhalation / sigh cues into the word stream so speech
- * sounds gentle and expressive without slow punctuation dead pauses.
- */
 function buildExhalationWordStream(words: string[], mood: EmotionMood): string[] {
   const out: string[] = [];
 
@@ -209,7 +202,6 @@ export default function SweetieAIPage() {
   const [micError, setMicError] = useState("");
   const [activeMood, setActiveMood] = useState<EmotionMood>("smile");
 
-  // Draggable petal-sweeping brush state
   const [brushPos, setBrushPos] = useState<{ x: number; y: number } | null>(
     null
   );
@@ -234,7 +226,6 @@ export default function SweetieAIPage() {
     }
   }, []);
 
-  // Heavy gravity falling petals + bottom pile accumulation + manual brush sweeping
   useEffect(() => {
     if (!unlocked) return;
     const canvas = canvasRef.current;
@@ -261,7 +252,6 @@ export default function SweetieAIPage() {
       settled: false,
     });
 
-    // Spawn a rich initial shower of petals
     petalsRef.current = Array.from({ length: 140 }, () => createPetal(false));
 
     const handleResize = () => {
@@ -278,7 +268,6 @@ export default function SweetieAIPage() {
     const tick = () => {
       ctx.clearRect(0, 0, width, height);
 
-      // Continuously spawn falling petals from top so bottom pile grows richly
       if (petalsRef.current.length < 360 && Math.random() < 0.72) {
         petalsRef.current.push(createPetal(true));
       }
@@ -293,11 +282,9 @@ export default function SweetieAIPage() {
           p.y += p.vy;
           p.rotation += p.vRot;
 
-          // Keep inside horizontal bounds
           if (p.x < 10) p.x = 10;
           if (p.x > width - 10) p.x = width - 10;
 
-          // Floor & bottom pile landing
           const pileJitter = ((Math.sin(p.x * 0.04) + 1) * 0.5) * maxPileHeight;
           const floorY = height - 10 - pileJitter;
 
@@ -310,7 +297,6 @@ export default function SweetieAIPage() {
           }
         }
 
-        // Draw petal shape
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation);
@@ -863,14 +849,12 @@ export default function SweetieAIPage() {
 
   return (
     <div className="relative max-w-3xl mx-auto space-y-4 animate-fade-up">
-      {/* Gravity Falling & Bottom-Collected Petals Canvas */}
       <canvas
         ref={canvasRef}
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-20"
       />
 
-      {/* Floating Brush While Dragging */}
       {draggingBrush && brushPos && (
         <div
           style={{ left: brushPos.x - 24, top: brushPos.y - 24 }}
@@ -881,7 +865,6 @@ export default function SweetieAIPage() {
         </div>
       )}
 
-      {/* Header */}
       <div className="relative z-30 rounded-3xl px-5 py-4 bg-gradient-to-r from-rose-50/95 via-white/95 to-pink-50/95 border border-rose-200 shadow-lg flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
@@ -908,7 +891,6 @@ export default function SweetieAIPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Draggable Petal-Sweeping Brush Handle */}
           <button
             type="button"
             onPointerDown={(e) => {
@@ -979,7 +961,6 @@ export default function SweetieAIPage() {
         </div>
       </div>
 
-      {/* Main AI Chat Box */}
       <div
         className={`relative z-30 rounded-[2rem] bg-white/95 border shadow-xl overflow-hidden flex flex-col h-[64vh] min-h-[430px] transition-all duration-300 ${
           isChatAnimated
