@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   RefreshCw,
   Users,
   MessageSquare,
   Clock,
   ShieldCheck,
+  X,
+  ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -44,12 +46,19 @@ interface SweetieSessionRow {
 
 interface UnifiedQuestionRow {
   uid: string;
+  user_id: string;
   user_identifier: string;
   email: string;
   full_name: string;
   question: string;
   ai_reply: string;
   created_at: string;
+}
+
+interface SelectedUserFilter {
+  key: string;
+  label: string;
+  email: string;
 }
 
 function formatDateTime(value?: string | null): string {
@@ -173,6 +182,9 @@ export default function AdminUserQuestionsPanel() {
   const [users, setUsers] = useState<SweetieUserRow[]>([]);
   const [sessions, setSessions] = useState<SweetieSessionRow[]>([]);
   const [questions, setQuestions] = useState<UnifiedQuestionRow[]>([]);
+  const [selectedUser, setSelectedUser] = useState<SelectedUserFilter | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -319,20 +331,23 @@ export default function AdminUserQuestionsPanel() {
         if (!qText) return;
         const aText = params.aiReply.trim();
         const createdAt = params.createdAt || new Date().toISOString();
+        const rawUserId = String(params.row.user_id || "").trim();
         const rawIdent = String(
           params.row.user_identifier ||
             params.row.email ||
             params.row.user_id ||
             "User"
         ).trim();
-        const lookup = profileByKey.get(rawIdent.toLowerCase());
+        const lookup =
+          profileByKey.get(rawIdent.toLowerCase()) ||
+          profileByKey.get(rawUserId.toLowerCase());
         const resolvedEmail = pickUserEmail(params.row) || lookup?.email || "";
         const resolvedName =
           pickUserName(params.row) ||
           lookup?.full_name ||
           (resolvedEmail ? resolvedEmail.split("@")[0] : rawIdent);
 
-        const dedupKey = `${qText.toLowerCase()}::${aText
+        const dedupKey = `${rawUserId.toLowerCase()}::${rawIdent.toLowerCase()}::${qText.toLowerCase()}::${aText
           .slice(0, 60)
           .toLowerCase()}::${createdAt.slice(0, 16)}`;
         if (seenQuestionKeys.has(dedupKey)) return;
@@ -340,6 +355,7 @@ export default function AdminUserQuestionsPanel() {
 
         unifiedQuestions.push({
           uid: params.idPart,
+          user_id: rawUserId,
           user_identifier: rawIdent,
           email: resolvedEmail,
           full_name: resolvedName,
@@ -433,6 +449,56 @@ export default function AdminUserQuestionsPanel() {
     void loadAllLogs();
   }, [loadAllLogs]);
 
+  const openUserChats = (u: SweetieUserRow) => {
+    const email = String(u.email || u.user_email || "").trim();
+    const userId = String(u.user_id || u.id || "").trim();
+    const name = String(
+      u.full_name || u.user_name || u.name || (email ? email.split("@")[0] : "User")
+    ).trim();
+
+    setSelectedUser({
+      key: (userId || email).toLowerCase(),
+      label: name,
+      email,
+    });
+    setActiveTab("questions");
+  };
+
+  const filteredQuestions = useMemo(() => {
+    if (!selectedUser) return questions;
+    const targetKey = selectedUser.key.toLowerCase();
+    const targetEmail = selectedUser.email.toLowerCase();
+
+    return questions.filter((q) => {
+      const qUserId = q.user_id.trim().toLowerCase();
+      const qIdent = q.user_identifier.trim().toLowerCase();
+      const qEmail = q.email.trim().toLowerCase();
+
+      if (targetKey && (qUserId === targetKey || qIdent === targetKey)) {
+        return true;
+      }
+      if (targetEmail && (qEmail === targetEmail || qIdent === targetEmail)) {
+        return true;
+      }
+      return false;
+    });
+  }, [questions, selectedUser]);
+
+  const getUserChatCount = (u: SweetieUserRow): number => {
+    const email = String(u.email || u.user_email || "").trim().toLowerCase();
+    const userId = String(u.user_id || u.id || "").trim().toLowerCase();
+
+    return questions.filter((q) => {
+      const qUserId = q.user_id.trim().toLowerCase();
+      const qIdent = q.user_identifier.trim().toLowerCase();
+      const qEmail = q.email.trim().toLowerCase();
+      return (
+        (userId && (qUserId === userId || qIdent === userId)) ||
+        (email && (qEmail === email || qIdent === email))
+      );
+    }).length;
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto p-4 sm:p-6 space-y-5 text-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-rose-200 rounded-2xl p-4 shadow-sm">
@@ -466,45 +532,62 @@ export default function AdminUserQuestionsPanel() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab("users")}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer ${
-            activeTab === "users"
-              ? "bg-rose-600 text-white"
-              : "bg-white border border-rose-200 text-slate-700"
-          }`}
-        >
-          <Users size={14} />
-          <span>Unique Users ({users.length})</span>
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTab("users")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer ${
+              activeTab === "users"
+                ? "bg-rose-600 text-white"
+                : "bg-white border border-rose-200 text-slate-700"
+            }`}
+          >
+            <Users size={14} />
+            <span>Unique Users ({users.length})</span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("questions")}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer ${
-            activeTab === "questions"
-              ? "bg-rose-600 text-white"
-              : "bg-white border border-rose-200 text-slate-700"
-          }`}
-        >
-          <MessageSquare size={14} />
-          <span>User Questions ({questions.length})</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("questions")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer ${
+              activeTab === "questions"
+                ? "bg-rose-600 text-white"
+                : "bg-white border border-rose-200 text-slate-700"
+            }`}
+          >
+            <MessageSquare size={14} />
+            <span>
+              {selectedUser
+                ? `${selectedUser.label}'s Chats (${filteredQuestions.length})`
+                : `User Questions (${questions.length})`}
+            </span>
+          </button>
 
-        <button
-          type="button"
-          onClick={() => setActiveTab("sessions")}
-          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer ${
-            activeTab === "sessions"
-              ? "bg-rose-600 text-white"
-              : "bg-white border border-rose-200 text-slate-700"
-          }`}
-        >
-          <Clock size={14} />
-          <span>Sessions & Runtime ({sessions.length})</span>
-        </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("sessions")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer ${
+              activeTab === "sessions"
+                ? "bg-rose-600 text-white"
+                : "bg-white border border-rose-200 text-slate-700"
+            }`}
+          >
+            <Clock size={14} />
+            <span>Sessions & Runtime ({sessions.length})</span>
+          </button>
+        </div>
+
+        {selectedUser && activeTab === "questions" && (
+          <button
+            type="button"
+            onClick={() => setSelectedUser(null)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-mono font-bold text-rose-700 cursor-pointer"
+          >
+            <X size={13} />
+            <span>Show All Users ({questions.length})</span>
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -522,51 +605,92 @@ export default function AdminUserQuestionsPanel() {
                 <th className="p-3">User / Google ID</th>
                 <th className="p-3">Created</th>
                 <th className="p-3">Last Login</th>
+                <th className="p-3 text-right">AI Chats</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((u, idx) => (
-                <tr
-                  key={String(u.user_id || u.email || u.id || idx)}
-                  className="border-b border-rose-50"
-                >
-                  <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
-                  <td className="p-3 font-semibold text-slate-900">
-                    {u.full_name || u.user_name || u.name || "—"}
-                  </td>
-                  <td className="p-3 font-mono text-rose-700">
-                    {u.email || u.user_email || "—"}
-                  </td>
-                  <td className="p-3 font-mono text-[11px] text-slate-500">
-                    <div>{u.user_id || u.id || "—"}</div>
-                    {u.google_id && (
-                      <div className="text-[10px] text-slate-400">
-                        Google ID: {u.google_id}
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-3 text-slate-600">
-                    {formatDateTime(u.created_at)}
-                  </td>
-                  <td className="p-3 text-slate-600">
-                    {formatDateTime(u.last_login_at)}
-                  </td>
-                </tr>
-              ))}
+              {users.map((u, idx) => {
+                const chatCount = getUserChatCount(u);
+                return (
+                  <tr
+                    key={String(u.user_id || u.email || u.id || idx)}
+                    onClick={() => openUserChats(u)}
+                    className="border-b border-rose-50 hover:bg-rose-50/50 transition-colors cursor-pointer"
+                  >
+                    <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
+                    <td className="p-3 font-semibold text-slate-900">
+                      {u.full_name || u.user_name || u.name || "—"}
+                    </td>
+                    <td className="p-3 font-mono text-rose-700">
+                      {u.email || u.user_email || "—"}
+                    </td>
+                    <td className="p-3 font-mono text-[11px] text-slate-500">
+                      <div>{u.user_id || u.id || "—"}</div>
+                      {u.google_id && (
+                        <div className="text-[10px] text-slate-400">
+                          Google ID: {u.google_id}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3 text-slate-600">
+                      {formatDateTime(u.created_at)}
+                    </td>
+                    <td className="p-3 text-slate-600">
+                      {formatDateTime(u.last_login_at)}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openUserChats(u);
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-800 font-mono text-[11px] font-bold cursor-pointer"
+                      >
+                        <span>Chats ({chatCount})</span>
+                        <ChevronRight size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       ) : activeTab === "questions" ? (
-        <div className="space-y-2.5">
-          {questions.length === 0 ? (
+        <div className="space-y-3">
+          {selectedUser && (
+            <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-mono">
+              <div>
+                Viewing separate AI chat log for{" "}
+                <strong className="text-slate-900">{selectedUser.label}</strong>
+                {selectedUser.email && (
+                  <span className="ml-2 text-rose-700">
+                    ({selectedUser.email})
+                  </span>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedUser(null)}
+                className="underline text-rose-700 font-bold cursor-pointer"
+              >
+                View all users combined
+              </button>
+            </div>
+          )}
+
+          {filteredQuestions.length === 0 ? (
             <div className="p-6 text-center text-xs font-mono text-slate-500 bg-white rounded-2xl border border-rose-100">
-              No questions found yet.
+              {selectedUser
+                ? `No AI chats found for ${selectedUser.label}.`
+                : "No questions found yet."}
             </div>
           ) : (
-            questions.map((q) => (
+            filteredQuestions.map((q) => (
               <div
                 key={q.uid}
-                className="p-4 rounded-2xl bg-white border border-rose-200 shadow-sm space-y-1.5"
+                className="p-4 rounded-2xl bg-white border border-rose-200 shadow-sm space-y-2"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-500">
                   <div>
