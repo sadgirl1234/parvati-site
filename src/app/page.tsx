@@ -11,6 +11,7 @@ import {
   Heart,
   BookOpen,
   Send,
+  ThumbsUp,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -19,6 +20,7 @@ interface GuestbookEntry {
   name: string;
   message: string;
   created_at: string;
+  likes?: number | null;
 }
 
 const LOVE_NOTES = [
@@ -27,40 +29,20 @@ const LOVE_NOTES = [
   "Some connections don't need loud words; just being there makes everything feel brighter and calm.",
 ];
 
-const GUESTBOOK_STORAGE_KEY = "parvati_guestbook_entries_v1";
+const GUESTBOOK_STORAGE_KEY = "parvati_guestbook_entries_v2";
+const LIKED_IDS_STORAGE_KEY = "parvati_guestbook_liked_ids_v2";
 
-const OLD_GUESTBOOK_MESSAGES: GuestbookEntry[] = [
-  {
-    id: "old-gb-1",
-    name: "Sweetie🌸",
-    message: "Welcome to Parvati's space! Drop a sweet note in the guestbook.",
-    created_at: "2026-11-20T10:00:00.000Z",
-  },
-  {
-    id: "old-gb-2",
-    name: "Parvati",
-    message: "Always happy to have good vibes, smiles, and warm messages here.",
-    created_at: "2026-11-21T14:30:00.000Z",
-  },
-];
-
-function mergeGuestbookEntries(lists: GuestbookEntry[][]): GuestbookEntry[] {
-  const seen = new Set<string>();
-  const merged: GuestbookEntry[] = [];
-
-  for (const list of lists) {
-    for (const item of list) {
-      if (!item || !item.message?.trim()) continue;
-      const key = `${(item.name || "Guest").trim().toLowerCase()}::${item.message.trim().toLowerCase()}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      merged.push(item);
-    }
-  }
-
-  return merged.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+function formatMessageDateTime(iso: string): string {
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return iso;
+  return dt.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 export default function HomePage() {
@@ -70,7 +52,8 @@ export default function HomePage() {
 
   const [guestName, setGuestName] = useState("");
   const [guestMessage, setGuestMessage] = useState("");
-  const [entries, setEntries] = useState<GuestbookEntry[]>(OLD_GUESTBOOK_MESSAGES);
+  const [entries, setEntries] = useState<GuestbookEntry[]>([]);
+  const [likedIds, setLikedIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -89,44 +72,44 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    let localEntries: GuestbookEntry[] = [];
     try {
-      const raw = localStorage.getItem(GUESTBOOK_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as GuestbookEntry[];
-        if (Array.isArray(parsed)) {
-          localEntries = parsed;
+      const rawLikes = localStorage.getItem(LIKED_IDS_STORAGE_KEY);
+      if (rawLikes) {
+        const parsedLikes = JSON.parse(rawLikes) as unknown;
+        if (Array.isArray(parsedLikes)) {
+          setLikedIds(parsedLikes.map(String));
         }
       }
     } catch {
       // Ignored
     }
 
-    const initialCombined = mergeGuestbookEntries([
-      localEntries,
-      OLD_GUESTBOOK_MESSAGES,
-    ]);
-    setEntries(initialCombined);
+    try {
+      const raw = localStorage.getItem(GUESTBOOK_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as GuestbookEntry[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEntries(parsed);
+        }
+      }
+    } catch {
+      // Ignored
+    }
 
     supabase
-      .from("sweetie_guestbook")
-      .select("id, name, message, created_at")
+      .from("parvati_guestbook")
+      .select("id, name, message, likes, created_at")
       .order("created_at", { ascending: false })
-      .limit(50)
+      .limit(100)
       .then(({ data }) => {
-        const remoteEntries = Array.isArray(data)
-          ? (data as GuestbookEntry[])
-          : [];
-        const combined = mergeGuestbookEntries([
-          remoteEntries,
-          localEntries,
-          OLD_GUESTBOOK_MESSAGES,
-        ]);
-        setEntries(combined);
-        try {
-          localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(combined));
-        } catch {
-          // Ignored
+        if (Array.isArray(data) && data.length > 0) {
+          const rows = data as GuestbookEntry[];
+          setEntries(rows);
+          try {
+            localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(rows));
+          } catch {
+            // Ignored
+          }
         }
       });
   }, []);
@@ -138,36 +121,98 @@ export default function HomePage() {
     if (!cleanMsg || submitting) return;
 
     setSubmitting(true);
-    const newEntry: GuestbookEntry = {
-      id: `gb-${Date.now()}`,
+    const createdIso = new Date().toISOString();
+    const tempId = `temp-${Date.now()}`;
+    const optimisticEntry: GuestbookEntry = {
+      id: tempId,
       name: cleanName,
       message: cleanMsg,
-      created_at: new Date().toISOString(),
+      created_at: createdIso,
+      likes: 0,
     };
 
-    const nextList = mergeGuestbookEntries([[newEntry], entries]);
-    setEntries(nextList);
+    const optimisticList = [optimisticEntry, ...entries];
+    setEntries(optimisticList);
     setGuestName("");
     setGuestMessage("");
 
     try {
-      localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(nextList));
-    } catch {
-      // Ignored
-    }
+      const { data } = await supabase
+        .from("parvati_guestbook")
+        .insert([
+          {
+            name: cleanName,
+            message: cleanMsg,
+            likes: 0,
+            created_at: createdIso,
+          },
+        ])
+        .select("id, name, message, likes, created_at")
+        .maybeSingle();
 
-    try {
-      await supabase.from("sweetie_guestbook").insert([
-        {
-          name: cleanName,
-          message: cleanMsg,
-          created_at: newEntry.created_at,
-        },
-      ]);
+      if (data) {
+        const inserted = data as GuestbookEntry;
+        const synced = optimisticList.map((item) =>
+          item.id === tempId ? inserted : item
+        );
+        setEntries(synced);
+        try {
+          localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(synced));
+        } catch {
+          // Ignored
+        }
+      }
     } catch {
       // Ignored
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleToggleLike = async (entry: GuestbookEntry) => {
+    const idStr = String(entry.id);
+    const alreadyLiked = likedIds.includes(idStr);
+    const currentLikes = Math.max(0, Number(entry.likes ?? 0));
+    const nextLikes = alreadyLiked
+      ? Math.max(0, currentLikes - 1)
+      : currentLikes + 1;
+
+    const nextLikedIds = alreadyLiked
+      ? likedIds.filter((x) => x !== idStr)
+      : [...likedIds, idStr];
+
+    setLikedIds(nextLikedIds);
+    try {
+      localStorage.setItem(
+        LIKED_IDS_STORAGE_KEY,
+        JSON.stringify(nextLikedIds)
+      );
+    } catch {
+      // Ignored
+    }
+
+    const updatedEntries = entries.map((item) =>
+      String(item.id) === idStr ? { ...item, likes: nextLikes } : item
+    );
+    setEntries(updatedEntries);
+    try {
+      localStorage.setItem(
+        GUESTBOOK_STORAGE_KEY,
+        JSON.stringify(updatedEntries)
+      );
+    } catch {
+      // Ignored
+    }
+
+    if (!idStr.startsWith("temp-")) {
+      try {
+        await supabase
+          .from("parvati_guestbook")
+          .update({ likes: nextLikes })
+          .eq("id", entry.id);
+      } catch {
+        // Ignored
+      }
     }
   };
 
@@ -326,11 +371,13 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Guestbook Form + Old & Saved Messages Below */}
+        {/* Guestbook Form + Messages from parvati_guestbook */}
         <div className="max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-white/95 border border-rose-200/80 shadow-md space-y-4 text-left">
-          <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
-            <BookOpen size={15} />
-            <span>Guestbook</span>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
+              <BookOpen size={15} />
+              <span>Guestbook ({entries.length})</span>
+            </div>
           </div>
 
           <form onSubmit={handleGuestbookSubmit} className="space-y-3">
@@ -363,27 +410,60 @@ export default function HomePage() {
             </div>
           </form>
 
-          {/* Old & Saved Guestbook Messages Below */}
-          <div className="space-y-2.5 max-h-64 overflow-y-auto pt-2 border-t border-rose-100">
-            {entries.map((item) => (
-              <div
-                key={item.id}
-                className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-100 space-y-1"
-              >
-                <div className="flex items-center justify-between gap-2 text-[11px] font-mono">
-                  <span className="font-bold text-slate-900">{item.name}</span>
-                  <span className="text-slate-400">
-                    {new Date(item.created_at).toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                    })}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-700 leading-relaxed">
-                  {item.message}
-                </p>
-              </div>
-            ))}
+          {/* All Guestbook Messages from parvati_guestbook */}
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pt-2 border-t border-rose-100">
+            {entries.length === 0 ? (
+              <p className="text-xs text-slate-500 text-center py-3">
+                Loading guestbook messages...
+              </p>
+            ) : (
+              entries.map((item) => {
+                const idStr = String(item.id);
+                const isLiked = likedIds.includes(idStr);
+                const likeCount = Math.max(0, Number(item.likes ?? 0));
+
+                return (
+                  <div
+                    key={item.id}
+                    className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-100 space-y-1.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                      <span className="font-bold text-slate-900">
+                        {item.name}
+                      </span>
+                      <span className="text-slate-400">
+                        {formatMessageDateTime(item.created_at)}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      {item.message}
+                    </p>
+
+                    <div className="flex items-center justify-end pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLike(item)}
+                        aria-label={isLiked ? "Unlike message" : "Like message"}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-bold transition-colors cursor-pointer ${
+                          isLiked
+                            ? "bg-rose-100 text-rose-700 border border-rose-200"
+                            : "bg-white hover:bg-rose-50 text-slate-600 border border-rose-100"
+                        }`}
+                      >
+                        <ThumbsUp
+                          size={12}
+                          className={
+                            isLiked ? "fill-rose-600 text-rose-600" : ""
+                          }
+                        />
+                        <span>{likeCount}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </div>
