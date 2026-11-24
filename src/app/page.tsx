@@ -29,21 +29,49 @@ const LOVE_NOTES = [
 
 const GUESTBOOK_STORAGE_KEY = "parvati_guestbook_entries_v1";
 
-const INITIAL_GUESTBOOK: GuestbookEntry[] = [
+const OLD_GUESTBOOK_MESSAGES: GuestbookEntry[] = [
   {
-    id: "gb-1",
+    id: "old-gb-1",
     name: "Sweetie🌸",
     message: "Welcome to Parvati's space! Drop a sweet note in the guestbook.",
-    created_at: new Date().toISOString(),
+    created_at: "2026-11-20T10:00:00.000Z",
+  },
+  {
+    id: "old-gb-2",
+    name: "Parvati",
+    message: "Always happy to have good vibes, smiles, and warm messages here.",
+    created_at: "2026-11-21T14:30:00.000Z",
   },
 ];
+
+function mergeGuestbookEntries(lists: GuestbookEntry[][]): GuestbookEntry[] {
+  const seen = new Set<string>();
+  const merged: GuestbookEntry[] = [];
+
+  for (const list of lists) {
+    for (const item of list) {
+      if (!item || !item.message?.trim()) continue;
+      const key = `${(item.name || "Guest").trim().toLowerCase()}::${item.message.trim().toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+  }
+
+  return merged.sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
 
 export default function HomePage() {
   const [muted, setMuted] = useState(true);
   const [noteIdx, setNoteIdx] = useState(0);
+  const [dpSrc, setDpSrc] = useState("/images/parvati.jpg");
+  const [dpFallbackText, setDpFallbackText] = useState(false);
+
   const [guestName, setGuestName] = useState("");
   const [guestMessage, setGuestMessage] = useState("");
-  const [entries, setEntries] = useState<GuestbookEntry[]>(INITIAL_GUESTBOOK);
+  const [entries, setEntries] = useState<GuestbookEntry[]>(OLD_GUESTBOOK_MESSAGES);
   const [submitting, setSubmitting] = useState(false);
 
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -62,35 +90,44 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    let loadedLocal: GuestbookEntry[] = [];
+    let localEntries: GuestbookEntry[] = [];
     try {
       const raw = localStorage.getItem(GUESTBOOK_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as GuestbookEntry[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          loadedLocal = parsed;
-          setEntries(parsed);
+        if (Array.isArray(parsed)) {
+          localEntries = parsed;
         }
       }
     } catch {
       // Ignored
     }
 
+    const initialCombined = mergeGuestbookEntries([
+      localEntries,
+      OLD_GUESTBOOK_MESSAGES,
+    ]);
+    setEntries(initialCombined);
+
     supabase
       .from("sweetie_guestbook")
       .select("id, name, message, created_at")
       .order("created_at", { ascending: false })
-      .limit(30)
+      .limit(50)
       .then(({ data }) => {
-        if (data && data.length > 0) {
-          setEntries(data as GuestbookEntry[]);
-          try {
-            localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(data));
-          } catch {
-            // Ignored
-          }
-        } else if (loadedLocal.length === 0) {
-          setEntries(INITIAL_GUESTBOOK);
+        const remoteEntries = Array.isArray(data)
+          ? (data as GuestbookEntry[])
+          : [];
+        const combined = mergeGuestbookEntries([
+          remoteEntries,
+          localEntries,
+          OLD_GUESTBOOK_MESSAGES,
+        ]);
+        setEntries(combined);
+        try {
+          localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(combined));
+        } catch {
+          // Ignored
         }
       });
   }, []);
@@ -109,7 +146,7 @@ export default function HomePage() {
       created_at: new Date().toISOString(),
     };
 
-    const nextList = [newEntry, ...entries];
+    const nextList = mergeGuestbookEntries([[newEntry], entries]);
     setEntries(nextList);
     setGuestName("");
     setGuestMessage("");
@@ -210,7 +247,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Center: Full Name with Animated Color (top badge removed) */}
+          {/* Center: Full Name with Animated Color */}
           <div className="flex flex-col items-center justify-center space-y-2 px-2">
             <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight animated-name-text leading-tight">
               Kumari Parvati Singh
@@ -224,12 +261,25 @@ export default function HomePage() {
           {/* Right: parvati.jpg Profile Image */}
           <div className="flex flex-col items-center justify-center">
             <div className="relative p-1.5 rounded-full bg-gradient-to-tr from-rose-200 via-pink-100 to-amber-100 border border-rose-200 shadow-lg">
-              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-rose-50 relative">
-                <img
-                  src="/images/parvati.jpg"
-                  alt="Kumari Parvati Singh"
-                  className="w-full h-full object-cover"
-                />
+              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-gradient-to-br from-rose-100 to-pink-100 flex items-center justify-center relative">
+                {dpFallbackText ? (
+                  <span className="text-3xl font-heading font-bold text-rose-600">
+                    KPS
+                  </span>
+                ) : (
+                  <img
+                    src={dpSrc}
+                    alt="Kumari Parvati Singh"
+                    onError={() => {
+                      if (dpSrc !== "/images/parvati-dp.jpg") {
+                        setDpSrc("/images/parvati-dp.jpg");
+                      } else {
+                        setDpFallbackText(true);
+                      }
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -283,7 +333,7 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Guestbook Section at Bottom */}
+        {/* Guestbook Form + Saved & Old Messages Below */}
         <div className="max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-white/95 border border-rose-200/80 shadow-md space-y-4 text-left">
           <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
             <BookOpen size={15} />
@@ -320,7 +370,8 @@ export default function HomePage() {
             </div>
           </form>
 
-          <div className="space-y-2.5 max-h-60 overflow-y-auto pt-1">
+          {/* Old & Saved Guestbook Messages Shown Below the Form */}
+          <div className="space-y-2.5 max-h-64 overflow-y-auto pt-2 border-t border-rose-100">
             {entries.map((item) => (
               <div
                 key={item.id}
