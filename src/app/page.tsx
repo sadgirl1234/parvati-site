@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   MessageCircle,
@@ -12,6 +12,8 @@ import {
   BookOpen,
   Send,
   ThumbsUp,
+  RefreshCw,
+  Flame,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -55,6 +57,8 @@ export default function HomePage() {
   const [entries, setEntries] = useState<GuestbookEntry[]>([]);
   const [likedIds, setLikedIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sortBy, setSortBy] = useState<"newest" | "likes">("newest");
 
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -69,6 +73,31 @@ export default function HomePage() {
       setNoteIdx((prev) => (prev + 1) % LOVE_NOTES.length);
     }, 6000);
     return () => window.clearInterval(interval);
+  }, []);
+
+  const fetchGuestbookFromDb = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setRefreshing(true);
+    try {
+      const { data } = await supabase
+        .from("parvati_guestbook")
+        .select("id, name, message, likes, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (Array.isArray(data)) {
+        const rows = data as GuestbookEntry[];
+        setEntries(rows);
+        try {
+          localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(rows));
+        } catch {
+          // Ignored
+        }
+      }
+    } catch {
+      // Ignored
+    } finally {
+      if (showSpinner) setRefreshing(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -96,23 +125,8 @@ export default function HomePage() {
       // Ignored
     }
 
-    supabase
-      .from("parvati_guestbook")
-      .select("id, name, message, likes, created_at")
-      .order("created_at", { ascending: false })
-      .limit(100)
-      .then(({ data }) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const rows = data as GuestbookEntry[];
-          setEntries(rows);
-          try {
-            localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(rows));
-          } catch {
-            // Ignored
-          }
-        }
-      });
-  }, []);
+    void fetchGuestbookFromDb(false);
+  }, [fetchGuestbookFromDb]);
 
   const handleGuestbookSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,6 +229,19 @@ export default function HomePage() {
       }
     }
   };
+
+  const totalLikes = entries.reduce(
+    (sum, item) => sum + Math.max(0, Number(item.likes ?? 0)),
+    0
+  );
+
+  const displayedEntries = [...entries].sort((a, b) => {
+    if (sortBy === "likes") {
+      const diff = Math.max(0, Number(b.likes ?? 0)) - Math.max(0, Number(a.likes ?? 0));
+      if (diff !== 0) return diff;
+    }
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-rose-50/80 via-white to-pink-50/80 text-slate-900 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
@@ -371,12 +398,40 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Guestbook Form + Messages from parvati_guestbook */}
+        {/* Guestbook Form + Messages with Likes, Sorting, Refresh, and Full Date & Time */}
         <div className="max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-white/95 border border-rose-200/80 shadow-md space-y-4 text-left">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
               <BookOpen size={15} />
               <span>Guestbook ({entries.length})</span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px]">
+                <Flame size={11} /> {totalLikes} likes
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() =>
+                  setSortBy((prev) => (prev === "newest" ? "likes" : "newest"))
+                }
+                className="px-2.5 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-[11px] font-mono font-bold text-rose-700 cursor-pointer"
+              >
+                {sortBy === "newest" ? "Sort: Newest" : "Sort: Top Likes"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void fetchGuestbookFromDb(true)}
+                aria-label="Refresh guestbook"
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-[11px] font-mono font-bold text-slate-700 cursor-pointer"
+              >
+                <RefreshCw
+                  size={11}
+                  className={refreshing ? "animate-spin" : ""}
+                />
+                <span>Refresh</span>
+              </button>
             </div>
           </div>
 
@@ -412,12 +467,12 @@ export default function HomePage() {
 
           {/* All Guestbook Messages from parvati_guestbook */}
           <div className="space-y-2.5 max-h-72 overflow-y-auto pt-2 border-t border-rose-100">
-            {entries.length === 0 ? (
+            {displayedEntries.length === 0 ? (
               <p className="text-xs text-slate-500 text-center py-3">
-                Loading guestbook messages...
+                No guestbook messages yet. Be the first to post!
               </p>
             ) : (
-              entries.map((item) => {
+              displayedEntries.map((item) => {
                 const idStr = String(item.id);
                 const isLiked = likedIds.includes(idStr);
                 const likeCount = Math.max(0, Number(item.likes ?? 0));
