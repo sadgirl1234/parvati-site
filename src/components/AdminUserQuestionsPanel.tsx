@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   X,
   ChevronRight,
+  Mail,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -42,6 +43,13 @@ interface SweetieSessionRow {
   last_active_at?: string | null;
   created_at?: string | null;
   [key: string]: unknown;
+}
+
+interface ContactMessageRow {
+  id: string | number;
+  sender_name: string;
+  message: string;
+  created_at: string;
 }
 
 interface UnifiedQuestionRow {
@@ -175,13 +183,37 @@ function loadLocalHistoricalQuestions(): Record<string, unknown>[] {
   return collected;
 }
 
+function loadLocalContactMessages(): ContactMessageRow[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("parvati_contact_messages_v1");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((x): x is Record<string, unknown> => Boolean(x && typeof x === "object"))
+      .map((item, idx) => ({
+        id: (item.id as string | number) ?? `local-c-${idx}`,
+        sender_name: String(item.sender_name || item.name || "Guest"),
+        message: String(item.message || ""),
+        created_at: String(item.created_at || ""),
+      }))
+      .filter((x) => Boolean(x.message.trim()));
+  } catch {
+    return [];
+  }
+}
+
 export default function AdminUserQuestionsPanel() {
   const [activeTab, setActiveTab] = useState<
-    "users" | "questions" | "sessions"
+    "users" | "questions" | "sessions" | "contacts"
   >("users");
   const [users, setUsers] = useState<SweetieUserRow[]>([]);
   const [sessions, setSessions] = useState<SweetieSessionRow[]>([]);
   const [questions, setQuestions] = useState<UnifiedQuestionRow[]>([]);
+  const [contactMessages, setContactMessages] = useState<ContactMessageRow[]>(
+    []
+  );
   const [selectedUser, setSelectedUser] = useState<SelectedUserFilter | null>(
     null
   );
@@ -192,12 +224,17 @@ export default function AdminUserQuestionsPanel() {
     setLoading(true);
     setErrorMsg(null);
     try {
-      const [usersRes, sessionsRes, sweetieQRes, legacyLogsRes] =
+      const [usersRes, sessionsRes, sweetieQRes, legacyLogsRes, contactsRes] =
         await Promise.all([
           supabase.from("sweetie_users").select("*").limit(5000),
           supabase.from("sweetie_user_sessions").select("*").limit(5000),
           supabase.from("sweetie_user_questions").select("*").limit(5000),
           supabase.from("parvati_ai_logs").select("*").limit(5000),
+          supabase
+            .from("parvati_contact_messages")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(5000),
         ]);
 
       if (usersRes.error) {
@@ -216,7 +253,35 @@ export default function AdminUserQuestionsPanel() {
       const rawLegacyLogs = Array.isArray(legacyLogsRes.data)
         ? (legacyLogsRes.data as Record<string, unknown>[])
         : [];
+      const remoteContacts: ContactMessageRow[] = Array.isArray(
+        contactsRes.data
+      )
+        ? (contactsRes.data as Record<string, unknown>[]).map((r, idx) => ({
+            id: (r.id as string | number) ?? `db-c-${idx}`,
+            sender_name: String(r.sender_name || r.name || "Guest"),
+            message: String(r.message || ""),
+            created_at: String(r.created_at || ""),
+          }))
+        : [];
+      const localContacts = loadLocalContactMessages();
       const localHistorical = loadLocalHistoricalQuestions();
+
+      // Merge & deduplicate contact messages
+      const mergedContacts: ContactMessageRow[] = [];
+      const seenContacts = new Set<string>();
+      for (const item of [...remoteContacts, ...localContacts]) {
+        const msgText = item.message.trim();
+        if (!msgText) continue;
+        const cKey = `${item.sender_name.toLowerCase()}::${msgText.toLowerCase()}::${item.created_at.slice(0, 16)}`;
+        if (seenContacts.has(cKey)) continue;
+        seenContacts.add(cKey);
+        mergedContacts.push(item);
+      }
+      mergedContacts.sort(
+        (a, b) =>
+          new Date(b.created_at || 0).getTime() -
+          new Date(a.created_at || 0).getTime()
+      );
 
       const profileByKey = new Map<
         string,
@@ -436,6 +501,7 @@ export default function AdminUserQuestionsPanel() {
       setUsers(sortedUsers);
       setSessions(sortedSessions);
       setQuestions(unifiedQuestions);
+      setContactMessages(mergedContacts);
     } catch (err) {
       setErrorMsg(
         err instanceof Error ? err.message : "Failed to load admin logs"
@@ -453,7 +519,10 @@ export default function AdminUserQuestionsPanel() {
     const email = String(u.email || u.user_email || "").trim();
     const userId = String(u.user_id || u.id || "").trim();
     const name = String(
-      u.full_name || u.user_name || u.name || (email ? email.split("@")[0] : "User")
+      u.full_name ||
+        u.user_name ||
+        u.name ||
+        (email ? email.split("@")[0] : "User")
     ).trim();
 
     setSelectedUser({
@@ -509,9 +578,10 @@ export default function AdminUserQuestionsPanel() {
               Admin Activity & Logs (Permanent)
             </h2>
             <p className="text-xs text-slate-500">
-              Unique Users: <strong>{users.length}</strong> • Sessions:{" "}
-              <strong>{sessions.length}</strong> • Questions:{" "}
-              <strong>{questions.length}</strong>
+              Unique Users: <strong>{users.length}</strong> • Questions:{" "}
+              <strong>{questions.length}</strong> • Sessions:{" "}
+              <strong>{sessions.length}</strong> • Contact Notes:{" "}
+              <strong>{contactMessages.length}</strong>
             </p>
           </div>
         </div>
@@ -562,6 +632,19 @@ export default function AdminUserQuestionsPanel() {
                 ? `${selectedUser.label}'s Chats (${filteredQuestions.length})`
                 : `User Questions (${questions.length})`}
             </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("contacts")}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer ${
+              activeTab === "contacts"
+                ? "bg-rose-600 text-white"
+                : "bg-white border border-rose-200 text-slate-700"
+            }`}
+          >
+            <Mail size={14} />
+            <span>Contact Messages ({contactMessages.length})</span>
           </button>
 
           <button
@@ -714,6 +797,33 @@ export default function AdminUserQuestionsPanel() {
                     {q.ai_reply}
                   </p>
                 )}
+              </div>
+            ))
+          )}
+        </div>
+      ) : activeTab === "contacts" ? (
+        <div className="space-y-2.5">
+          {contactMessages.length === 0 ? (
+            <div className="p-6 text-center text-xs font-mono text-slate-500 bg-white rounded-2xl border border-rose-100">
+              No contact messages yet.
+            </div>
+          ) : (
+            contactMessages.map((c) => (
+              <div
+                key={String(c.id)}
+                className="p-4 rounded-2xl bg-white border border-rose-200 shadow-sm space-y-1.5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                  <span className="font-bold text-rose-700">
+                    {c.sender_name || "Guest"}
+                  </span>
+                  <span className="text-slate-400">
+                    {formatDateTime(c.created_at)}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-800 whitespace-pre-wrap leading-relaxed">
+                  {c.message}
+                </p>
               </div>
             ))
           )}

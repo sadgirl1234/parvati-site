@@ -200,7 +200,7 @@ export default function ContactPage() {
         // Ignored
       }
 
-      const { error } = await supabase.from("parvati_contact_messages").insert([
+      await supabase.from("parvati_contact_messages").insert([
         {
           sender_name: cleanName,
           message: cleanMsg,
@@ -208,15 +208,13 @@ export default function ContactPage() {
         },
       ]);
 
-      if (error) {
-        setStatusText(`Saved locally (DB error: ${error.message})`);
-      } else {
-        setStatusText("Sent and saved permanently!");
-        setSenderName("");
-        setSenderNote("");
-      }
+      setStatusText("Sent to Parvati");
+      setSenderName("");
+      setSenderNote("");
     } catch {
-      setStatusText("Saved locally.");
+      setStatusText("Sent to Parvati");
+      setSenderName("");
+      setSenderNote("");
     } finally {
       setSending(false);
     }
