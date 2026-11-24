@@ -18,6 +18,7 @@ interface SweetieUserRow {
   user_email?: string | null;
   full_name?: string | null;
   name?: string | null;
+  user_name?: string | null;
   display_name?: string | null;
   created_at?: string | null;
   last_login_at?: string | null;
@@ -29,10 +30,12 @@ interface SweetieSessionRow {
   user_id?: string | null;
   email?: string | null;
   user_email?: string | null;
+  user_name?: string | null;
   full_name?: string | null;
   name?: string | null;
   duration_seconds?: number | null;
   started_at?: string | null;
+  login_at?: string | null;
   ended_at?: string | null;
   created_at?: string | null;
   [key: string]: unknown;
@@ -46,7 +49,6 @@ interface UnifiedQuestionRow {
   question: string;
   ai_reply: string;
   created_at: string;
-  source: "parvati_ai_logs" | "sweetie_user_questions";
 }
 
 function formatDateTime(value?: string | null): string {
@@ -73,10 +75,10 @@ function formatDuration(seconds?: number | null): string {
 
 function pickUserName(row: Record<string, unknown>): string {
   const candidates = [
+    row.user_name,
     row.full_name,
     row.display_name,
     row.name,
-    row.user_name,
     row.google_name,
   ];
   for (const val of candidates) {
@@ -87,8 +89,8 @@ function pickUserName(row: Record<string, unknown>): string {
 
 function pickUserEmail(row: Record<string, unknown>): string {
   const candidates = [
-    row.email,
     row.user_email,
+    row.email,
     row.google_email,
     row.user_identifier,
   ];
@@ -96,6 +98,71 @@ function pickUserEmail(row: Record<string, unknown>): string {
     if (typeof val === "string" && val.includes("@")) return val.trim();
   }
   return "";
+}
+
+function loadLocalHistoricalQuestions(): Record<string, unknown>[] {
+  const collected: Record<string, unknown>[] = [];
+  if (typeof window === "undefined") return collected;
+
+  try {
+    const rawBackup = localStorage.getItem("sweetie_stored_questions_v1");
+    if (rawBackup) {
+      const parsed = JSON.parse(rawBackup) as unknown;
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item && typeof item === "object") {
+            collected.push(item as Record<string, unknown>);
+          }
+        }
+      }
+    }
+  } catch {
+    // Ignored
+  }
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("sweetie_permanent_chat_")) continue;
+      const rawChat = localStorage.getItem(key);
+      if (!rawChat) continue;
+      const msgs = JSON.parse(rawChat) as unknown;
+      if (!Array.isArray(msgs)) continue;
+
+      const userKey = decodeURIComponent(
+        key.replace("sweetie_permanent_chat_", "")
+      );
+
+      for (let mIdx = 0; mIdx < msgs.length; mIdx++) {
+        const msg = msgs[mIdx] as {
+          role?: string;
+          content?: string;
+          time?: string;
+        };
+        if (msg?.role === "user" && typeof msg.content === "string") {
+          const nextMsg = msgs[mIdx + 1] as
+            | { role?: string; content?: string }
+            | undefined;
+          const replyText =
+            nextMsg?.role === "assistant" && typeof nextMsg.content === "string"
+              ? nextMsg.content
+              : "";
+          collected.push({
+            id: `local-${key}-${mIdx}`,
+            user_id: userKey,
+            user_identifier: userKey,
+            question: msg.content,
+            ai_reply: replyText,
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+    }
+  } catch {
+    // Ignored
+  }
+
+  return collected;
 }
 
 export default function AdminUserQuestionsPanel() {
@@ -136,8 +203,8 @@ export default function AdminUserQuestionsPanel() {
       const rawLegacyLogs = Array.isArray(legacyLogsRes.data)
         ? (legacyLogsRes.data as Record<string, unknown>[])
         : [];
+      const localHistorical = loadLocalHistoricalQuestions();
 
-      // Build lookup maps so user_id or email resolves to Google Name & Email everywhere
       const profileByKey = new Map<
         string,
         { email: string; full_name: string; google_id: string }
@@ -150,7 +217,9 @@ export default function AdminUserQuestionsPanel() {
         const googleId =
           typeof row.google_id === "string" ? row.google_id.trim() : "";
         const ids = [row.user_id, row.user_identifier, email]
-          .filter((v): v is string => typeof v === "string" && Boolean(v.trim()))
+          .filter(
+            (v): v is string => typeof v === "string" && Boolean(v.trim())
+          )
           .map((v) => v.trim().toLowerCase());
 
         for (const k of ids) {
@@ -167,11 +236,13 @@ export default function AdminUserQuestionsPanel() {
       rawSessions.forEach(registerProfile);
       rawSweetieQ.forEach(registerProfile);
       rawLegacyLogs.forEach(registerProfile);
+      localHistorical.forEach(registerProfile);
 
-      // Deduplicate unique users by user_id or email without dropping distinct accounts
       const uniqueMap = new Map<string, SweetieUserRow>();
       for (const row of rawUsers) {
-        const rawKey = String(row.user_id || row.email || row.id || Math.random())
+        const rawKey = String(
+          row.user_id || row.email || row.id || Math.random()
+        )
           .trim()
           .toLowerCase();
         const resolved = profileByKey.get(rawKey);
@@ -225,60 +296,119 @@ export default function AdminUserQuestionsPanel() {
 
       const sortedSessions = [...rawSessions].sort(
         (a, b) =>
-          new Date(b.started_at || b.created_at || 0).getTime() -
-          new Date(a.started_at || a.created_at || 0).getTime()
+          new Date(
+            b.started_at || b.login_at || b.created_at || 0
+          ).getTime() -
+          new Date(
+            a.started_at || a.login_at || a.created_at || 0
+          ).getTime()
       );
 
-      // Merge questions from both parvati_ai_logs and sweetie_user_questions
       const unifiedQuestions: UnifiedQuestionRow[] = [];
       const seenQuestionKeys = new Set<string>();
 
-      const addQuestionRow = (
-        row: Record<string, unknown>,
-        source: "parvati_ai_logs" | "sweetie_user_questions",
-        idx: number
-      ) => {
-        const qText = String(
-          row.question || row.prompt || row.user_message || row.message || ""
-        ).trim();
+      const pushPair = (params: {
+        idPart: string;
+        row: Record<string, unknown>;
+        question: string;
+        aiReply: string;
+        createdAt: string;
+      }) => {
+        const qText = params.question.trim();
         if (!qText) return;
-
-        const aText = String(
-          row.ai_reply || row.answer || row.response || row.reply || ""
-        ).trim();
-        const createdAt = String(row.created_at || "");
+        const aText = params.aiReply.trim();
+        const createdAt = params.createdAt || new Date().toISOString();
         const rawIdent = String(
-          row.user_identifier || row.email || row.user_id || "User"
+          params.row.user_identifier ||
+            params.row.email ||
+            params.row.user_id ||
+            "User"
         ).trim();
         const lookup = profileByKey.get(rawIdent.toLowerCase());
-        const resolvedEmail = pickUserEmail(row) || lookup?.email || "";
+        const resolvedEmail = pickUserEmail(params.row) || lookup?.email || "";
         const resolvedName =
-          pickUserName(row) ||
+          pickUserName(params.row) ||
           lookup?.full_name ||
           (resolvedEmail ? resolvedEmail.split("@")[0] : rawIdent);
 
-        const dedupKey = `${rawIdent.toLowerCase()}::${qText.toLowerCase()}::${createdAt.slice(0, 16)}`;
+        const dedupKey = `${qText.toLowerCase()}::${aText
+          .slice(0, 60)
+          .toLowerCase()}::${createdAt.slice(0, 16)}`;
         if (seenQuestionKeys.has(dedupKey)) return;
         seenQuestionKeys.add(dedupKey);
 
         unifiedQuestions.push({
-          uid: `${source}-${String(row.id ?? idx)}`,
+          uid: params.idPart,
           user_identifier: rawIdent,
           email: resolvedEmail,
           full_name: resolvedName,
           question: qText,
           ai_reply: aText,
           created_at: createdAt,
-          source,
         });
       };
 
-      rawSweetieQ.forEach((row, idx) =>
-        addQuestionRow(row, "sweetie_user_questions", idx)
-      );
-      rawLegacyLogs.forEach((row, idx) =>
-        addQuestionRow(row, "parvati_ai_logs", idx)
-      );
+      const ingestQuestionRow = (
+        row: Record<string, unknown>,
+        prefix: string,
+        idx: number
+      ) => {
+        const createdAt = String(row.created_at || "");
+        const directQ = String(
+          row.question ||
+            row.prompt ||
+            row.user_message ||
+            row.query ||
+            row.message ||
+            ""
+        ).trim();
+        const directA = String(
+          row.ai_reply ||
+            row.answer ||
+            row.response ||
+            row.reply ||
+            row.assistant_message ||
+            ""
+        ).trim();
+
+        if (directQ) {
+          pushPair({
+            idPart: `${prefix}-${String(row.id ?? idx)}`,
+            row,
+            question: directQ,
+            aiReply: directA,
+            createdAt,
+          });
+        }
+
+        const convo = row.conversation_json;
+        if (Array.isArray(convo)) {
+          for (let i = 0; i < convo.length; i++) {
+            const item = convo[i] as { role?: string; content?: string };
+            if (item?.role === "user" && typeof item.content === "string") {
+              const nextItem = convo[i + 1] as
+                | { role?: string; content?: string }
+                | undefined;
+              const reply =
+                nextItem?.role === "assistant" &&
+                typeof nextItem.content === "string"
+                  ? nextItem.content
+                  : "";
+              pushPair({
+                idPart: `${prefix}-convo-${String(row.id ?? idx)}-${i}`,
+                row,
+                question: item.content,
+                aiReply: reply,
+                createdAt,
+              });
+            }
+          }
+        }
+      };
+
+      rawSweetieQ.forEach((r, idx) => ingestQuestionRow(r, "sq", idx));
+      rawLegacyLogs.forEach((r, idx) => ingestQuestionRow(r, "lg", idx));
+      localHistorical.forEach((r, idx) => ingestQuestionRow(r, "lc", idx));
 
       unifiedQuestions.sort(
         (a, b) =>
@@ -401,10 +531,10 @@ export default function AdminUserQuestionsPanel() {
                 >
                   <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
                   <td className="p-3 font-semibold text-slate-900">
-                    {u.full_name || u.name || "—"}
+                    {u.full_name || u.user_name || u.name || "—"}
                   </td>
                   <td className="p-3 font-mono text-rose-700">
-                    {u.email || "—"}
+                    {u.email || u.user_email || "—"}
                   </td>
                   <td className="p-3 font-mono text-[11px] text-slate-500">
                     <div>{u.user_id || u.id || "—"}</div>
@@ -429,7 +559,7 @@ export default function AdminUserQuestionsPanel() {
         <div className="space-y-2.5">
           {questions.length === 0 ? (
             <div className="p-6 text-center text-xs font-mono text-slate-500 bg-white rounded-2xl border border-rose-100">
-              No questions found in parvati_ai_logs or sweetie_user_questions.
+              No questions found yet.
             </div>
           ) : (
             questions.map((q) => (
@@ -481,20 +611,27 @@ export default function AdminUserQuestionsPanel() {
                   <td className="p-3 font-mono text-slate-400">{idx + 1}</td>
                   <td className="p-3 font-mono">
                     <div className="font-semibold text-slate-900">
-                      {s.full_name || s.name || s.email || s.user_id || "—"}
+                      {s.full_name ||
+                        s.user_name ||
+                        s.name ||
+                        s.email ||
+                        s.user_id ||
+                        "—"}
                     </div>
-                    {s.email && (
-                      <div className="text-[11px] text-rose-700">{s.email}</div>
+                    {(s.email || s.user_email) && (
+                      <div className="text-[11px] text-rose-700">
+                        {s.email || s.user_email}
+                      </div>
                     )}
                   </td>
                   <td className="p-3 font-mono font-bold text-rose-700">
                     {formatDuration(s.duration_seconds)}
                   </td>
                   <td className="p-3 text-slate-600">
-                    {formatDateTime(s.started_at)}
+                    {formatDateTime(s.started_at || s.login_at)}
                   </td>
                   <td className="p-3 text-slate-600">
-                    {formatDateTime(s.ended_at)}
+                    {formatDateTime(s.ended_at || s.last_active_at)}
                   </td>
                 </tr>
               ))}
