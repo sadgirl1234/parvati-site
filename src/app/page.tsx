@@ -547,32 +547,23 @@ export default function HomePage() {
       />
 
       <div className="relative z-10 max-w-5xl w-full flex flex-col items-center text-center space-y-8">
-        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center, Borderless) | parvati.jpg (Right) */}
+        {/* Top Showcase Row: parvati.jpg DP (Left) | Kumari Parvati Singh (Center) | Video DP (Right) */}
         <div className="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-4">
-          {/* Left: Rounded Lovely Video DP */}
+          {/* Left: Rounded Lovely parvati.jpg Profile Image */}
           <div className="flex flex-col items-center justify-center">
             <div className="relative p-1.5 rounded-full lovely-ring shadow-lg shadow-pink-200/70">
               <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-[#fffdf9] relative ring-2 ring-[#fffdf9]">
-                <video
-                  ref={dpVideoRef}
-                  src="/videos/sweetie-dp.mp4"
-                  autoPlay
-                  loop
-                  muted={muted}
-                  playsInline
+                <img
+                  src={dpSrc}
+                  alt="Kumari Parvati Singh"
+                  onError={() => {
+                    if (dpSrc === "/parvati.jpg") {
+                      setDpSrc("/parvati.png");
+                    }
+                  }}
                   className="w-full h-full object-cover"
                 />
               </div>
-
-              <button
-                type="button"
-                onClick={() => setMuted((prev) => !prev)}
-                aria-label={muted ? "Unmute DP video" : "Mute DP video"}
-                title={muted ? "Unmute sound" : "Mute sound"}
-                className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[#fffdf9] hover:bg-pink-500 text-rose-600 hover:text-white border border-pink-200 flex items-center justify-center shadow-md transition-colors cursor-pointer"
-              >
-                {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-              </button>
             </div>
           </div>
 
@@ -631,21 +622,30 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Right: Rounded Lovely parvati.jpg Profile Image */}
+          {/* Right: Rounded Lovely Video DP */}
           <div className="flex flex-col items-center justify-center">
             <div className="relative p-1.5 rounded-full lovely-ring shadow-lg shadow-pink-200/70">
               <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-[#fffdf9] relative ring-2 ring-[#fffdf9]">
-                <img
-                  src={dpSrc}
-                  alt="Kumari Parvati Singh"
-                  onError={() => {
-                    if (dpSrc === "/parvati.jpg") {
-                      setDpSrc("/parvati.png");
-                    }
-                  }}
+                <video
+                  ref={dpVideoRef}
+                  src="/videos/sweetie-dp.mp4"
+                  autoPlay
+                  loop
+                  muted={muted}
+                  playsInline
                   className="w-full h-full object-cover"
                 />
               </div>
+
+              <button
+                type="button"
+                onClick={() => setMuted((prev) => !prev)}
+                aria-label={muted ? "Unmute DP video" : "Mute DP video"}
+                title={muted ? "Unmute sound" : "Mute sound"}
+                className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[#fffdf9] hover:bg-pink-500 text-rose-600 hover:text-white border border-pink-200 flex items-center justify-center shadow-md transition-colors cursor-pointer"
+              >
+                {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+              </button>
             </div>
           </div>
         </div>
