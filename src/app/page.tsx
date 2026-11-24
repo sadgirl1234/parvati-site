@@ -66,8 +66,7 @@ function mergeGuestbookEntries(lists: GuestbookEntry[][]): GuestbookEntry[] {
 export default function HomePage() {
   const [muted, setMuted] = useState(true);
   const [noteIdx, setNoteIdx] = useState(0);
-  const [dpSrc, setDpSrc] = useState("/images/parvati.jpg");
-  const [dpFallbackText, setDpFallbackText] = useState(false);
+  const [dpSrc, setDpSrc] = useState("/parvati.jpg");
 
   const [guestName, setGuestName] = useState("");
   const [guestMessage, setGuestMessage] = useState("");
@@ -218,7 +217,7 @@ export default function HomePage() {
       `}</style>
 
       <div className="relative z-10 max-w-5xl w-full flex flex-col items-center text-center space-y-8">
-        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | parvati.jpg (Right) */}
+        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | Navbar Avatar Image (Right) */}
         <div className="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-4">
           {/* Left: Animated Video DP with Animated Border */}
           <div className="flex flex-col items-center justify-center">
@@ -258,28 +257,22 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Right: parvati.jpg Profile Image */}
+          {/* Right: Same Avatar Image as Navigation Bar */}
           <div className="flex flex-col items-center justify-center">
-            <div className="relative p-1.5 rounded-full bg-gradient-to-tr from-rose-200 via-pink-100 to-amber-100 border border-rose-200 shadow-lg">
-              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-gradient-to-br from-rose-100 to-pink-100 flex items-center justify-center relative">
-                {dpFallbackText ? (
-                  <span className="text-3xl font-heading font-bold text-rose-600">
-                    KPS
-                  </span>
-                ) : (
-                  <img
-                    src={dpSrc}
-                    alt="Kumari Parvati Singh"
-                    onError={() => {
-                      if (dpSrc !== "/images/parvati-dp.jpg") {
-                        setDpSrc("/images/parvati-dp.jpg");
-                      } else {
-                        setDpFallbackText(true);
-                      }
-                    }}
-                    className="w-full h-full object-cover"
-                  />
-                )}
+            <div className="relative p-1.5 rounded-full animated-dp-border shadow-xl">
+              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-rose-50 relative">
+                <img
+                  src={dpSrc}
+                  alt="Kumari Parvati Singh"
+                  onError={() => {
+                    if (dpSrc === "/parvati.jpg") {
+                      setDpSrc("/parvati.png");
+                    } else if (dpSrc === "/parvati.png") {
+                      setDpSrc("/images/parvati.jpg");
+                    }
+                  }}
+                  className="w-full h-full object-cover"
+                />
               </div>
             </div>
           </div>
@@ -333,7 +326,7 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Guestbook Form + Saved & Old Messages Below */}
+        {/* Guestbook Form + Old & Saved Messages Below */}
         <div className="max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-white/95 border border-rose-200/80 shadow-md space-y-4 text-left">
           <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
             <BookOpen size={15} />
@@ -370,7 +363,7 @@ export default function HomePage() {
             </div>
           </form>
 
-          {/* Old & Saved Guestbook Messages Shown Below the Form */}
+          {/* Old & Saved Guestbook Messages Below */}
           <div className="space-y-2.5 max-h-64 overflow-y-auto pt-2 border-t border-rose-100">
             {entries.map((item) => (
               <div
