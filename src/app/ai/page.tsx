@@ -343,40 +343,56 @@ function drawRealisticPetal(ctx: CanvasRenderingContext2D, p: Petal) {
   ctx.restore();
 }
 
-async function storeUserQuestionRecord(params: {
-  userId: string;
-  userName: string;
-  userEmail: string;
-  authMethod: "google";
+async function logQuestionAndAnswer(params: {
   question: string;
   aiReply: string;
-  fullConversation: Message[];
+  userId?: string | null;
+  email?: string | null;
+  fullName?: string | null;
+  fullConversation?: Message[];
 }) {
+  const cleanQuestion = params.question.trim();
+  const cleanReply = params.aiReply.trim();
+  if (!cleanQuestion) return;
+
+  const identifier = params.email || params.userId || "guest";
+  const resolvedName =
+    params.fullName?.trim() ||
+    (params.email ? params.email.split("@")[0] : "Guest");
   const nowIso = new Date().toISOString();
-  const record = {
-    user_id: params.userId,
-    user_name: params.userName,
-    user_identifier: params.userEmail,
-    auth_method: params.authMethod,
-    question: params.question,
-    ai_reply: params.aiReply,
-    conversation_json: params.fullConversation,
+
+  const payload = {
+    user_identifier: identifier,
+    user_id: params.userId || null,
+    email: params.email || null,
+    user_name: resolvedName,
+    full_name: resolvedName,
+    auth_method: params.userId || params.email ? "google" : "guest",
+    question: cleanQuestion,
+    ai_reply: cleanReply,
+    conversation_json: params.fullConversation ?? [],
     created_at: nowIso,
   };
 
   try {
     const existingRaw = localStorage.getItem(QUESTION_BACKUP_KEY);
     const existing = existingRaw ? (JSON.parse(existingRaw) as unknown[]) : [];
-    const next = [{ id: Date.now(), ...record }, ...existing].slice(0, 200);
+    const next = [{ id: Date.now(), ...payload }, ...existing].slice(0, 200);
     localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(next));
   } catch {
     // Ignored
   }
 
   try {
-    await supabase.from("sweetie_user_questions").insert([record]);
-  } catch {
-    // Ignored
+    const { error } = await supabase
+      .from("sweetie_user_questions")
+      .insert([payload]);
+
+    if (error) {
+      console.error("sweetie_user_questions insert error:", error.message);
+    }
+  } catch (err) {
+    console.error("sweetie_user_questions insert failed:", err);
   }
 }
 
@@ -1152,13 +1168,12 @@ export default function SweetieAIPage() {
         setMessages(updatedWithReply);
         savePermanentUserMessages(userSession.userId, updatedWithReply);
 
-        await storeUserQuestionRecord({
-          userId: userSession.userId,
-          userName: activeName,
-          userEmail: userSession.email,
-          authMethod: userSession.method,
+        await logQuestionAndAnswer({
           question: text,
           aiReply: finalReply,
+          userId: userSession.userId,
+          email: userSession.email,
+          fullName: activeName,
           fullConversation: updatedWithReply,
         });
       } catch {
@@ -1175,13 +1190,12 @@ export default function SweetieAIPage() {
         setMessages(updatedWithErr);
         savePermanentUserMessages(userSession.userId, updatedWithErr);
 
-        await storeUserQuestionRecord({
-          userId: userSession.userId,
-          userName: activeName,
-          userEmail: userSession.email,
-          authMethod: userSession.method,
+        await logQuestionAndAnswer({
           question: text,
           aiReply: finalReply,
+          userId: userSession.userId,
+          email: userSession.email,
+          fullName: activeName,
           fullConversation: updatedWithErr,
         });
       } finally {
