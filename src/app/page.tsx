@@ -12,195 +12,146 @@ import {
   Shield,
 } from "lucide-react";
 
-interface SyncedPalette {
-  bgDark: string;
-  bgMid: string;
-  glowRgb: string;
+interface SyncedBg {
+  solid: string;
+  vignette: string;
 }
 
-const DEFAULT_PALETTE: SyncedPalette = {
-  bgDark: "#14171a",
-  bgMid: "#22272d",
-  glowRgb: "244, 63, 94",
+const INITIAL_BG: SyncedBg = {
+  solid: "#2c302d",
+  vignette: "#1f2220",
 };
 
 export default function HomePage() {
   const [muted, setMuted] = useState(true);
-  const [palette, setPalette] = useState<SyncedPalette>(DEFAULT_PALETTE);
+  const [bg, setBg] = useState<SyncedBg>(INITIAL_BG);
 
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
-  const ambientVideoRef = useRef<HTMLVideoElement | null>(null);
   const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Sync audio mute state across both DP and ambient background video
   useEffect(() => {
     if (dpVideoRef.current) {
       dpVideoRef.current.muted = muted;
     }
-    if (ambientVideoRef.current) {
-      ambientVideoRef.current.muted = true;
-    }
   }, [muted]);
 
-  // Sample live frame colors from the DP video to dynamically sync surrounding background
+  // Sample outer edge pixels of the video frame so the full screen matches the video's own background
   useEffect(() => {
-    const sampleCanvas = sampleCanvasRef.current;
-    const videoEl = dpVideoRef.current;
-    if (!sampleCanvas || !videoEl) return;
+    const canvas = sampleCanvasRef.current;
+    const video = dpVideoRef.current;
+    if (!canvas || !video) return;
 
-    const ctx = sampleCanvas.getContext("2d", { willReadFrequently: true });
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
     if (!ctx) return;
 
-    sampleCanvas.width = 16;
-    sampleCanvas.height = 16;
+    const w = 24;
+    const h = 24;
+    canvas.width = w;
+    canvas.height = h;
 
-    const interval = window.setInterval(() => {
-      if (videoEl.readyState < 2 || videoEl.paused) return;
+    const sampleEdgeBackground = () => {
+      if (video.readyState < 2 || video.paused) return;
 
       try {
-        ctx.drawImage(videoEl, 0, 0, 16, 16);
-        const frame = ctx.getImageData(0, 0, 16, 16).data;
+        ctx.drawImage(video, 0, 0, w, h);
+        const data = ctx.getImageData(0, 0, w, h).data;
 
         let rSum = 0;
         let gSum = 0;
         let bSum = 0;
-        let brightR = 0;
-        let brightG = 0;
-        let brightB = 0;
-        let brightCount = 0;
-        const pixelCount = frame.length / 4;
+        let count = 0;
 
-        for (let i = 0; i < frame.length; i += 4) {
-          const r = frame[i];
-          const g = frame[i + 1];
-          const b = frame[i + 2];
-          rSum += r;
-          gSum += g;
-          bSum += b;
+        // Sample top, left, and right outer border strip pixels (avoids bright kitten & hand)
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const isEdge = x < 3 || x >= w - 3 || y < 3;
+            if (!isEdge) continue;
 
-          // Track warm/bright highlights (kitten fur & hand tones)
-          if (r + g + b > 260) {
-            brightR += r;
-            brightG += g;
-            brightB += b;
-            brightCount += 1;
+            const idx = (y * w + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+
+            rSum += r;
+            gSum += g;
+            bSum += b;
+            count += 1;
           }
         }
 
-        const avgR = Math.round(rSum / pixelCount);
-        const avgG = Math.round(gSum / pixelCount);
-        const avgB = Math.round(bSum / pixelCount);
+        if (count > 0) {
+          const r = Math.round(rSum / count);
+          const g = Math.round(gSum / count);
+          const b = Math.round(bSum / count);
 
-        const darkR = Math.max(10, Math.round(avgR * 0.35));
-        const darkG = Math.max(12, Math.round(avgG * 0.35));
-        const darkB = Math.max(15, Math.round(avgB * 0.38));
+          const dr = Math.max(8, Math.round(r * 0.72));
+          const dg = Math.max(8, Math.round(g * 0.72));
+          const db = Math.max(8, Math.round(b * 0.72));
 
-        const midR = Math.max(22, Math.round(avgR * 0.72));
-        const midG = Math.max(24, Math.round(avgG * 0.72));
-        const midB = Math.max(28, Math.round(avgB * 0.75));
-
-        const glowR =
-          brightCount > 0 ? Math.round(brightR / brightCount) : Math.min(255, avgR + 70);
-        const glowG =
-          brightCount > 0 ? Math.round(brightG / brightCount) : Math.min(255, avgG + 55);
-        const glowB =
-          brightCount > 0 ? Math.round(brightB / brightCount) : Math.min(255, avgB + 65);
-
-        setPalette({
-          bgDark: `rgb(${darkR}, ${darkG}, ${darkB})`,
-          bgMid: `rgb(${midR}, ${midG}, ${midB})`,
-          glowRgb: `${glowR}, ${glowG}, ${glowB}`,
-        });
+          setBg({
+            solid: `rgb(${r}, ${g}, ${b})`,
+            vignette: `rgb(${dr}, ${dg}, ${db})`,
+          });
+        }
       } catch {
-        // Ignored if canvas read is restricted
+        // Ignored
       }
-    }, 260);
+    };
 
+    const interval = window.setInterval(sampleEdgeBackground, 250);
     return () => window.clearInterval(interval);
   }, []);
 
   return (
-    <main
-      className="min-h-screen text-slate-100 flex flex-col items-center justify-center px-4 py-12 overflow-hidden relative transition-colors duration-500"
-      style={{
-        background: `radial-gradient(circle at 50% 34%, rgba(${palette.glowRgb}, 0.24), ${palette.bgMid} 52%, ${palette.bgDark} 100%)`,
-      }}
+    <div
+      className="min-h-screen w-full text-slate-100 flex flex-col items-center justify-center px-4 py-12 relative transition-colors duration-500"
+      style={{ backgroundColor: bg.solid }}
     >
-      {/* Hidden canvas used to read live video frame colors */}
-      <canvas ref={sampleCanvasRef} className="hidden" aria-hidden="true" />
-
-      {/* Full-bleed blurred video ambient layer synced to the DP video */}
+      {/* Full-viewport background fill matching the video's own background color */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 overflow-hidden opacity-30 scale-110 blur-3xl transition-opacity duration-500"
-      >
-        <video
-          ref={ambientVideoRef}
-          src="/videos/sweetie-dp.mp4"
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="w-full h-full object-cover"
-        />
-      </div>
-
-      {/* Soft vignette overlay so text stays crisp */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 bg-gradient-to-b from-black/35 via-black/15 to-black/55"
+        className="fixed inset-0 w-screen h-screen -z-10 transition-colors duration-500"
+        style={{
+          background: `radial-gradient(circle at 50% 42%, ${bg.solid} 0%, ${bg.vignette} 100%)`,
+        }}
       />
 
+      <canvas ref={sampleCanvasRef} className="hidden" aria-hidden="true" />
+
       <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center space-y-7">
-        {/* Animated DP Frame */}
+        {/* Clean, borderless animated DP video */}
         <div className="relative flex items-center justify-center">
-          <div
-            aria-hidden="true"
-            className="absolute -inset-5 rounded-full blur-2xl opacity-65 transition-all duration-500 pointer-events-none"
-            style={{
-              background: `radial-gradient(circle, rgba(${palette.glowRgb}, 0.55) 0%, rgba(244, 63, 94, 0.18) 65%, transparent 100%)`,
-            }}
-          />
-
-          <div
-            className="relative p-1.5 rounded-full border border-white/20 shadow-2xl transition-shadow duration-500"
-            style={{
-              background: `linear-gradient(135deg, rgba(${palette.glowRgb}, 0.65), rgba(244, 63, 94, 0.45), rgba(30, 41, 59, 0.75))`,
-              boxShadow: `0 0 55px rgba(${palette.glowRgb}, 0.35)`,
-            }}
-          >
-            <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-full overflow-hidden bg-slate-950 border-2 border-white/20 relative">
-              <video
-                ref={dpVideoRef}
-                src="/videos/sweetie-dp.mp4"
-                autoPlay
-                loop
-                muted={muted}
-                playsInline
-                className="w-full h-full object-cover"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setMuted((prev) => !prev)}
-              aria-label={muted ? "Unmute DP video" : "Mute DP video"}
-              title={muted ? "Unmute sound" : "Mute sound"}
-              className="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-slate-900/90 hover:bg-rose-600 border border-white/25 text-white flex items-center justify-center shadow-lg transition-colors cursor-pointer"
-            >
-              {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-            </button>
+          <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-full overflow-hidden relative shadow-none border-0 ring-0">
+            <video
+              ref={dpVideoRef}
+              src="/videos/sweetie-dp.mp4"
+              autoPlay
+              loop
+              muted={muted}
+              playsInline
+              className="w-full h-full object-cover border-0 outline-none"
+            />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMuted((prev) => !prev)}
+            aria-label={muted ? "Unmute DP video" : "Mute DP video"}
+            title={muted ? "Unmute sound" : "Mute sound"}
+            className="absolute bottom-1.5 right-1.5 w-9 h-9 rounded-full bg-black/45 hover:bg-black/70 text-white flex items-center justify-center transition-colors cursor-pointer"
+          >
+            {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
         </div>
 
         {/* Title & Subtitle */}
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-mono text-rose-200">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-black/25 text-xs font-mono text-rose-200">
             <Sparkles size={13} />
             <span>Parvati • Sweetie🌸</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white drop-shadow">
+          <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white">
             Parvati
           </h1>
 
@@ -225,7 +176,7 @@ export default function HomePage() {
             href="https://ig.me/m/parvatisingh3118"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 hover:bg-white/15 backdrop-blur-md border border-white/15 text-white font-mono text-xs font-bold transition-all"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-black/25 hover:bg-black/40 text-white font-mono text-xs font-bold transition-all"
           >
             <MessageCircle size={15} />
             <span>@parvatisingh3118</span>
@@ -233,13 +184,13 @@ export default function HomePage() {
 
           <Link
             href="/admin"
-            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-black/35 hover:bg-black/50 border border-white/10 text-slate-200 font-mono text-xs font-bold transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-black/25 hover:bg-black/40 text-slate-200 font-mono text-xs font-bold transition-all"
           >
             <Shield size={14} />
             <span>Admin</span>
           </Link>
         </div>
       </div>
-    </main>
+    </div>
   );
 }
