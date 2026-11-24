@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, Mail, Heart, Send, CheckCircle2 } from "lucide-react";
+import { MessageCircle, Heart, Send, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface RosePetal {
   x: number;
@@ -80,7 +81,8 @@ function drawLovelyPetalWithShadow(ctx: CanvasRenderingContext2D, p: RosePetal) 
 export default function ContactPage() {
   const [senderName, setSenderName] = useState("");
   const [senderNote, setSenderNote] = useState("");
-  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [statusText, setStatusText] = useState<string | null>(null);
 
   const petalCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const petalsRef = useRef<RosePetal[]>([]);
@@ -170,12 +172,54 @@ export default function ContactPage() {
     };
   }, []);
 
-  const handleSend = (e: React.FormEvent) => {
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!senderNote.trim()) return;
-    setSent(true);
-    setSenderName("");
-    setSenderNote("");
+    const cleanName = senderName.trim().slice(0, 50) || "Guest";
+    const cleanMsg = senderNote.trim().slice(0, 500);
+    if (!cleanMsg || sending) return;
+
+    setSending(true);
+    setStatusText(null);
+    const createdAt = new Date().toISOString();
+
+    try {
+      const localRecord = {
+        id: `contact-${Date.now()}`,
+        sender_name: cleanName,
+        message: cleanMsg,
+        created_at: createdAt,
+      };
+      try {
+        const raw = localStorage.getItem("parvati_contact_messages_v1");
+        const prev = raw ? (JSON.parse(raw) as unknown[]) : [];
+        localStorage.setItem(
+          "parvati_contact_messages_v1",
+          JSON.stringify([localRecord, ...prev].slice(0, 300))
+        );
+      } catch {
+        // Ignored
+      }
+
+      const { error } = await supabase.from("parvati_contact_messages").insert([
+        {
+          sender_name: cleanName,
+          message: cleanMsg,
+          created_at: createdAt,
+        },
+      ]);
+
+      if (error) {
+        setStatusText(`Saved locally (DB error: ${error.message})`);
+      } else {
+        setStatusText("Sent and saved permanently!");
+        setSenderName("");
+        setSenderNote("");
+      }
+    } catch {
+      setStatusText("Saved locally.");
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -200,21 +244,16 @@ export default function ContactPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
+        <div className="flex justify-center text-xs font-mono">
           <a
             href="https://ig.me/m/parvatisingh3118"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-[#fff8f3] hover:bg-pink-50 border border-pink-200 text-rose-800 font-bold transition-colors"
+            className="inline-flex items-center gap-2.5 px-5 py-3.5 rounded-2xl bg-[#fff8f3] hover:bg-pink-100/80 border border-pink-200 text-rose-800 font-bold transition-colors"
           >
             <MessageCircle size={16} className="text-pink-500" />
             <span>@parvatisingh3118</span>
           </a>
-
-          <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-[#fff8f3] border border-pink-200 text-rose-800">
-            <Mail size={16} className="text-pink-500" />
-            <span>parvati3118.vercel.app</span>
-          </div>
         </div>
 
         <form onSubmit={handleSend} className="space-y-3">
@@ -233,20 +272,20 @@ export default function ContactPage() {
             className="w-full px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950"
           />
           <div className="flex items-center justify-between gap-3">
-            {sent ? (
+            {statusText ? (
               <span className="inline-flex items-center gap-1.5 text-xs font-mono text-pink-700 font-bold">
-                <CheckCircle2 size={14} /> Note ready!
+                <CheckCircle2 size={14} /> {statusText}
               </span>
             ) : (
               <span />
             )}
             <button
               type="submit"
-              disabled={!senderNote.trim()}
+              disabled={sending || !senderNote.trim()}
               className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
             >
               <Send size={13} />
-              <span>Send</span>
+              <span>{sending ? "Sending..." : "Send"}</span>
             </button>
           </div>
         </form>
