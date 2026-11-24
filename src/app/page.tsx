@@ -9,17 +9,19 @@ import {
   VolumeX,
   ArrowRight,
   Bot,
-  Shield,
+  Heart,
 } from "lucide-react";
 
-const INITIAL_BG_COLOR = "rgb(44, 48, 45)";
+const LOVE_NOTES = [
+  "Every quiet moment feels softer when you're around, and even simple days turn into sweet memories.",
+  "A little warmth, a little laughter, and a whole lot of heart — always keeping things genuine and close.",
+  "Some connections don't need loud words; just being there makes everything feel brighter and calm.",
+];
 
 export default function HomePage() {
   const [muted, setMuted] = useState(true);
-  const [bgColor, setBgColor] = useState<string>(INITIAL_BG_COLOR);
-
+  const [noteIdx, setNoteIdx] = useState(0);
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
-  const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     if (dpVideoRef.current) {
@@ -27,134 +29,152 @@ export default function HomePage() {
     }
   }, [muted]);
 
-  // Sample outer edge pixels of the video frame so the surrounding background matches the video's exact color
   useEffect(() => {
-    const canvas = sampleCanvasRef.current;
-    const video = dpVideoRef.current;
-    if (!canvas || !video) return;
-
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) return;
-
-    const w = 24;
-    const h = 24;
-    canvas.width = w;
-    canvas.height = h;
-
-    const syncExactBg = () => {
-      if (video.readyState < 2 || video.paused) return;
-
-      try {
-        ctx.drawImage(video, 0, 0, w, h);
-        const data = ctx.getImageData(0, 0, w, h).data;
-
-        let rSum = 0;
-        let gSum = 0;
-        let bSum = 0;
-        let count = 0;
-
-        for (let y = 0; y < h; y++) {
-          for (let x = 0; x < w; x++) {
-            const isOuterEdge = x < 2 || x >= w - 2 || y < 2;
-            if (!isOuterEdge) continue;
-
-            const idx = (y * w + x) * 4;
-            rSum += data[idx];
-            gSum += data[idx + 1];
-            bSum += data[idx + 2];
-            count += 1;
-          }
-        }
-
-        if (count > 0) {
-          const r = Math.round(rSum / count);
-          const g = Math.round(gSum / count);
-          const b = Math.round(bSum / count);
-          setBgColor(`rgb(${r}, ${g}, ${b})`);
-        }
-      } catch {
-        // Ignored
-      }
-    };
-
-    const interval = window.setInterval(syncExactBg, 250);
+    const interval = window.setInterval(() => {
+      setNoteIdx((prev) => (prev + 1) % LOVE_NOTES.length);
+    }, 6000);
     return () => window.clearInterval(interval);
   }, []);
 
-  const featheredEdgeMask =
-    "radial-gradient(ellipse 74% 76% at 50% 48%, #000 56%, rgba(0,0,0,0.65) 76%, transparent 100%)";
-
   return (
-    <div
-      className="min-h-screen w-full text-slate-100 flex flex-col items-center justify-center px-4 py-10 relative transition-colors duration-300"
-      style={{ backgroundColor: bgColor }}
-    >
-      {/* Full-viewport single background layer */}
-      <div
-        aria-hidden="true"
-        className="fixed inset-0 w-screen h-screen -z-10 transition-colors duration-300"
-        style={{ backgroundColor: bgColor }}
-      />
+    <div className="min-h-screen w-full bg-gradient-to-b from-rose-50/80 via-white to-pink-50/80 text-slate-900 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
+      <style jsx>{`
+        @keyframes borderShift {
+          0% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
+          100% {
+            background-position: 0% 50%;
+          }
+        }
 
-      <canvas ref={sampleCanvasRef} className="hidden" aria-hidden="true" />
+        .animated-dp-border {
+          background: linear-gradient(
+            120deg,
+            #f43f5e,
+            #ec4899,
+            #f59e0b,
+            #e11d48,
+            #f43f5e
+          );
+          background-size: 260% 260%;
+          animation: borderShift 5s ease infinite;
+        }
 
-      <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center space-y-6">
-        {/* Zoomed video with feathered edges merged seamlessly into the surrounding background */}
-        <div className="relative flex items-center justify-center overflow-hidden w-72 h-80 sm:w-80 sm:h-96">
-          <div
-            className="w-full h-full flex items-center justify-center"
-            style={{
-              maskImage: featheredEdgeMask,
-              WebkitMaskImage: featheredEdgeMask,
-            }}
-          >
-            <video
-              ref={dpVideoRef}
-              src="/videos/sweetie-dp.mp4"
-              autoPlay
-              loop
-              muted={muted}
-              playsInline
-              className="w-full h-full object-contain scale-[1.22] border-0 outline-none shadow-none"
-            />
+        .animated-name-text {
+          background: linear-gradient(
+            90deg,
+            #e11d48,
+            #db2777,
+            #d97706,
+            #f43f5e,
+            #e11d48
+          );
+          background-size: 240% 240%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: borderShift 6s ease infinite;
+        }
+      `}</style>
+
+      <div className="relative z-10 max-w-5xl w-full flex flex-col items-center text-center space-y-8">
+        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | Previous DP (Right) */}
+        <div className="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-4">
+          {/* Left: Animated Video DP with Animated Border */}
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative p-1.5 rounded-full animated-dp-border shadow-xl">
+              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-slate-950 relative">
+                <video
+                  ref={dpVideoRef}
+                  src="/videos/sweetie-dp.mp4"
+                  autoPlay
+                  loop
+                  muted={muted}
+                  playsInline
+                  className="w-full h-full object-cover"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMuted((prev) => !prev)}
+                aria-label={muted ? "Unmute DP video" : "Mute DP video"}
+                title={muted ? "Unmute sound" : "Mute sound"}
+                className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-slate-900/90 hover:bg-rose-600 text-white flex items-center justify-center shadow-md transition-colors cursor-pointer"
+              >
+                {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setMuted((prev) => !prev)}
-            aria-label={muted ? "Unmute DP video" : "Mute DP video"}
-            title={muted ? "Unmute sound" : "Mute sound"}
-            className="absolute bottom-3 right-3 z-20 w-9 h-9 rounded-full bg-black/45 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer"
-          >
-            {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-          </button>
+          {/* Center: Full Name with Animated Color */}
+          <div className="flex flex-col items-center justify-center space-y-2 px-2">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/90 border border-rose-200 text-xs font-mono font-bold text-rose-700">
+              <Sparkles size={13} />
+              <span>Parvati • Sweetie🌸</span>
+            </div>
+
+            <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight animated-name-text leading-tight">
+              Kumari Parvati Singh
+            </h1>
+
+            <p className="text-xs sm:text-sm text-slate-600 max-w-xs leading-relaxed">
+              Warm vibes, playful moments, and sweet conversations anytime.
+            </p>
+          </div>
+
+          {/* Right: Previous DP Image */}
+          <div className="flex flex-col items-center justify-center">
+            <div className="relative p-1.5 rounded-full bg-gradient-to-tr from-rose-200 via-pink-100 to-amber-100 border border-rose-200 shadow-lg">
+              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-rose-50 relative">
+                <img
+                  src="/images/parvati-dp.jpg"
+                  alt="Kumari Parvati Singh"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Title & Subtitle */}
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-black/20 text-xs font-mono text-rose-200">
-            <Sparkles size={13} />
-            <span>Parvati • Sweetie🌸</span>
+        {/* Love Notes Card */}
+        <div className="max-w-xl w-full p-5 sm:p-6 rounded-3xl bg-white/95 border border-rose-200/80 shadow-md space-y-2.5">
+          <div className="inline-flex items-center gap-1.5 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
+            <Heart size={14} className="fill-rose-500 text-rose-500" />
+            <span>Love Notes</span>
           </div>
 
-          <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight text-white">
-            Parvati
-          </h1>
-
-          <p className="text-sm text-slate-200/90 max-w-md mx-auto leading-relaxed">
-            Talk with Sweetie🌸 AI, message directly on Instagram, or inspect
-            activity inside the admin panel.
+          <p className="text-sm sm:text-base text-slate-700 italic leading-relaxed">
+            &ldquo;{LOVE_NOTES[noteIdx]}&rdquo;
           </p>
+
+          <div className="flex items-center justify-center gap-1.5 pt-1">
+            {LOVE_NOTES.map((_, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setNoteIdx(idx)}
+                aria-label={`Show love note ${idx + 1}`}
+                className={`h-2 rounded-full transition-all cursor-pointer ${
+                  noteIdx === idx ? "w-6 bg-rose-500" : "w-2 bg-rose-200"
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* Navigation Links */}
-        <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+        {/* Action Buttons (Admin button removed) */}
+        <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/ai"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-mono text-xs font-bold shadow-lg transition-all hover:scale-[1.02]"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-mono text-xs font-bold shadow-md transition-all hover:scale-[1.02]"
           >
             <Bot size={15} />
-            <span>Open Sweetie🌸 AI</span>
+            <span>Chat with Sweetie🌸 AI</span>
             <ArrowRight size={15} />
           </Link>
 
@@ -162,19 +182,11 @@ export default function HomePage() {
             href="https://ig.me/m/parvatisingh3118"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-black/20 hover:bg-black/35 text-white font-mono text-xs font-bold transition-all"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 font-mono text-xs font-bold shadow-sm transition-all"
           >
             <MessageCircle size={15} />
             <span>@parvatisingh3118</span>
           </a>
-
-          <Link
-            href="/admin"
-            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-black/20 hover:bg-black/35 text-slate-200 font-mono text-xs font-bold transition-all"
-          >
-            <Shield size={14} />
-            <span>Admin</span>
-          </Link>
         </div>
       </div>
     </div>
