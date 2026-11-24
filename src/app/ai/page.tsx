@@ -62,6 +62,7 @@ interface Petal {
   swayPhase: number;
   swaySpeed: number;
   baseColor: string;
+  edgeColor: string;
   highlightColor: string;
   alpha: number;
   fading: boolean;
@@ -103,11 +104,10 @@ const SESSIONS_BACKUP_KEY = "sweetie_login_sessions_v1";
 const NAME_KEY = "sweetie_visitor_name";
 
 const PETAL_PALETTE = [
-  { base: "#e11d48", highlight: "#fda4af" },
-  { base: "#db2777", highlight: "#f9a8d4" },
-  { base: "#be123c", highlight: "#fecdd3" },
-  { base: "#f43f5e", highlight: "#ffe4e6" },
-  { base: "#c026d3", highlight: "#f5d0fe" },
+  { base: "#fb7185", highlight: "#ffe4e6", edge: "#e11d48" },
+  { base: "#f472b6", highlight: "#fce7f3", edge: "#db2777" },
+  { base: "#fda4af", highlight: "#fff1f2", edge: "#f43f5e" },
+  { base: "#f9a8d4", highlight: "#fdf2f8", edge: "#ec4899" },
 ];
 
 const THINKING_PHRASES = [
@@ -296,36 +296,35 @@ function drawRealisticPetal(ctx: CanvasRenderingContext2D, p: Petal) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(p.rotation);
-
-  ctx.shadowColor = `rgba(136, 19, 55, ${0.28 * p.alpha})`;
-  ctx.shadowBlur = 9;
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = 5;
-
-  const r = p.size;
-  const grad = ctx.createLinearGradient(-r, -r * 0.6, r, r * 0.6);
-  grad.addColorStop(0, p.highlightColor);
-  grad.addColorStop(0.45, p.baseColor);
-  grad.addColorStop(1, "#881337");
-
-  ctx.fillStyle = grad;
   ctx.globalAlpha = Math.max(0, Math.min(0.92, p.alpha));
 
+  ctx.shadowColor = "rgba(190, 24, 93, 0.24)";
+  ctx.shadowBlur = Math.max(8, p.size * 0.9);
+  ctx.shadowOffsetX = 2;
+  ctx.shadowOffsetY = Math.max(5, p.size * 0.55);
+
+  const r = p.size;
+  const grad = ctx.createLinearGradient(-r, -r * 0.7, r, r * 0.7);
+  grad.addColorStop(0, p.highlightColor);
+  grad.addColorStop(0.45, p.baseColor);
+  grad.addColorStop(1, p.edgeColor);
+
+  ctx.fillStyle = grad;
   ctx.beginPath();
   ctx.moveTo(-r * 0.85, 0);
   ctx.bezierCurveTo(
     -r * 0.55,
-    -r * 0.72,
+    -r * 0.82,
     r * 0.45,
-    -r * 0.68,
+    -r * 0.75,
     r * 0.95,
-    0
+    -r * 0.08
   );
   ctx.bezierCurveTo(
-    r * 0.45,
-    r * 0.68,
-    -r * 0.55,
-    r * 0.72,
+    r * 0.65,
+    r * 0.78,
+    -r * 0.45,
+    r * 0.82,
     -r * 0.85,
     0
   );
@@ -333,11 +332,11 @@ function drawRealisticPetal(ctx: CanvasRenderingContext2D, p: Petal) {
   ctx.fill();
 
   ctx.shadowColor = "transparent";
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.35 * p.alpha})`;
-  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+  ctx.lineWidth = 0.85;
   ctx.beginPath();
-  ctx.moveTo(-r * 0.65, 0);
-  ctx.quadraticCurveTo(0, -r * 0.08, r * 0.65, 0);
+  ctx.moveTo(-r * 0.62, 0);
+  ctx.quadraticCurveTo(0, -r * 0.1, r * 0.62, 0);
   ctx.stroke();
 
   ctx.restore();
@@ -762,7 +761,6 @@ export default function SweetieAIPage() {
     return () => subscription.unsubscribe();
   }, [hydrateUserSession]);
 
-  // Track active seconds spent on the website for this specific login session
   useEffect(() => {
     if (!userSession) return;
 
@@ -838,6 +836,7 @@ export default function SweetieAIPage() {
         swayPhase: Math.random() * Math.PI * 2,
         swaySpeed: 0.014 + Math.random() * 0.012,
         baseColor: pair.base,
+        edgeColor: pair.edge,
         highlightColor: pair.highlight,
         alpha: 0.9,
         fading: false,
