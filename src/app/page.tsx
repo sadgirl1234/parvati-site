@@ -3,14 +3,23 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Sparkles,
   MessageCircle,
   Volume2,
   VolumeX,
   ArrowRight,
   Bot,
   Heart,
+  BookOpen,
+  Send,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+
+interface GuestbookEntry {
+  id: string | number;
+  name: string;
+  message: string;
+  created_at: string;
+}
 
 const LOVE_NOTES = [
   "Every quiet moment feels softer when you're around, and even simple days turn into sweet memories.",
@@ -18,9 +27,25 @@ const LOVE_NOTES = [
   "Some connections don't need loud words; just being there makes everything feel brighter and calm.",
 ];
 
+const GUESTBOOK_STORAGE_KEY = "parvati_guestbook_entries_v1";
+
+const INITIAL_GUESTBOOK: GuestbookEntry[] = [
+  {
+    id: "gb-1",
+    name: "Sweetie🌸",
+    message: "Welcome to Parvati's space! Drop a sweet note in the guestbook.",
+    created_at: new Date().toISOString(),
+  },
+];
+
 export default function HomePage() {
   const [muted, setMuted] = useState(true);
   const [noteIdx, setNoteIdx] = useState(0);
+  const [guestName, setGuestName] = useState("");
+  const [guestMessage, setGuestMessage] = useState("");
+  const [entries, setEntries] = useState<GuestbookEntry[]>(INITIAL_GUESTBOOK);
+  const [submitting, setSubmitting] = useState(false);
+
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
@@ -35,6 +60,80 @@ export default function HomePage() {
     }, 6000);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    let loadedLocal: GuestbookEntry[] = [];
+    try {
+      const raw = localStorage.getItem(GUESTBOOK_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as GuestbookEntry[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          loadedLocal = parsed;
+          setEntries(parsed);
+        }
+      }
+    } catch {
+      // Ignored
+    }
+
+    supabase
+      .from("sweetie_guestbook")
+      .select("id, name, message, created_at")
+      .order("created_at", { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          setEntries(data as GuestbookEntry[]);
+          try {
+            localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(data));
+          } catch {
+            // Ignored
+          }
+        } else if (loadedLocal.length === 0) {
+          setEntries(INITIAL_GUESTBOOK);
+        }
+      });
+  }, []);
+
+  const handleGuestbookSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = guestName.trim().slice(0, 40) || "Guest";
+    const cleanMsg = guestMessage.trim().slice(0, 240);
+    if (!cleanMsg || submitting) return;
+
+    setSubmitting(true);
+    const newEntry: GuestbookEntry = {
+      id: `gb-${Date.now()}`,
+      name: cleanName,
+      message: cleanMsg,
+      created_at: new Date().toISOString(),
+    };
+
+    const nextList = [newEntry, ...entries];
+    setEntries(nextList);
+    setGuestName("");
+    setGuestMessage("");
+
+    try {
+      localStorage.setItem(GUESTBOOK_STORAGE_KEY, JSON.stringify(nextList));
+    } catch {
+      // Ignored
+    }
+
+    try {
+      await supabase.from("sweetie_guestbook").insert([
+        {
+          name: cleanName,
+          message: cleanMsg,
+          created_at: newEntry.created_at,
+        },
+      ]);
+    } catch {
+      // Ignored
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full bg-gradient-to-b from-rose-50/80 via-white to-pink-50/80 text-slate-900 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden">
@@ -82,7 +181,7 @@ export default function HomePage() {
       `}</style>
 
       <div className="relative z-10 max-w-5xl w-full flex flex-col items-center text-center space-y-8">
-        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | Previous DP (Right) */}
+        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | parvati.jpg (Right) */}
         <div className="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-4">
           {/* Left: Animated Video DP with Animated Border */}
           <div className="flex flex-col items-center justify-center">
@@ -111,13 +210,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Center: Full Name with Animated Color */}
+          {/* Center: Full Name with Animated Color (top badge removed) */}
           <div className="flex flex-col items-center justify-center space-y-2 px-2">
-            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-100/90 border border-rose-200 text-xs font-mono font-bold text-rose-700">
-              <Sparkles size={13} />
-              <span>Parvati • Sweetie🌸</span>
-            </div>
-
             <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight animated-name-text leading-tight">
               Kumari Parvati Singh
             </h1>
@@ -127,12 +221,12 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Right: Previous DP Image */}
+          {/* Right: parvati.jpg Profile Image */}
           <div className="flex flex-col items-center justify-center">
             <div className="relative p-1.5 rounded-full bg-gradient-to-tr from-rose-200 via-pink-100 to-amber-100 border border-rose-200 shadow-lg">
               <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-rose-50 relative">
                 <img
-                  src="/images/parvati-dp.jpg"
+                  src="/images/parvati.jpg"
                   alt="Kumari Parvati Singh"
                   className="w-full h-full object-cover"
                 />
@@ -167,7 +261,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Action Buttons (Admin button removed) */}
+        {/* Action Buttons */}
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/ai"
@@ -187,6 +281,66 @@ export default function HomePage() {
             <MessageCircle size={15} />
             <span>@parvatisingh3118</span>
           </a>
+        </div>
+
+        {/* Guestbook Section at Bottom */}
+        <div className="max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-white/95 border border-rose-200/80 shadow-md space-y-4 text-left">
+          <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
+            <BookOpen size={15} />
+            <span>Guestbook</span>
+          </div>
+
+          <form onSubmit={handleGuestbookSubmit} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <input
+                type="text"
+                value={guestName}
+                onChange={(e) => setGuestName(e.target.value)}
+                placeholder="Your name..."
+                className="px-3.5 py-2.5 rounded-2xl bg-rose-50/50 border border-rose-200 focus:border-rose-400 focus:bg-white focus:outline-none text-xs text-slate-900"
+              />
+              <input
+                type="text"
+                value={guestMessage}
+                onChange={(e) => setGuestMessage(e.target.value)}
+                placeholder="Write a sweet message..."
+                className="sm:col-span-2 px-3.5 py-2.5 rounded-2xl bg-rose-50/50 border border-rose-200 focus:border-rose-400 focus:bg-white focus:outline-none text-xs text-slate-900"
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={submitting || !guestMessage.trim()}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Send size={13} />
+                <span>{submitting ? "Posting..." : "Post Note"}</span>
+              </button>
+            </div>
+          </form>
+
+          <div className="space-y-2.5 max-h-60 overflow-y-auto pt-1">
+            {entries.map((item) => (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-2xl bg-rose-50/50 border border-rose-100 space-y-1"
+              >
+                <div className="flex items-center justify-between gap-2 text-[11px] font-mono">
+                  <span className="font-bold text-slate-900">{item.name}</span>
+                  <span className="text-slate-400">
+                    {new Date(item.created_at).toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-700 leading-relaxed">
+                  {item.message}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
