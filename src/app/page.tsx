@@ -12,19 +12,11 @@ import {
   Shield,
 } from "lucide-react";
 
-interface SyncedBg {
-  solid: string;
-  vignette: string;
-}
-
-const INITIAL_BG: SyncedBg = {
-  solid: "#2c302d",
-  vignette: "#1f2220",
-};
+const INITIAL_BG_COLOR = "rgb(44, 48, 45)";
 
 export default function HomePage() {
   const [muted, setMuted] = useState(true);
-  const [bg, setBg] = useState<SyncedBg>(INITIAL_BG);
+  const [bgColor, setBgColor] = useState<string>(INITIAL_BG_COLOR);
 
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
   const sampleCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -35,7 +27,7 @@ export default function HomePage() {
     }
   }, [muted]);
 
-  // Sample outer edge pixels of the video frame so the full screen matches the video's own background
+  // Sample outer edge pixels of the video frame so the entire screen uses one exact synced background color
   useEffect(() => {
     const canvas = sampleCanvasRef.current;
     const video = dpVideoRef.current;
@@ -49,7 +41,7 @@ export default function HomePage() {
     canvas.width = w;
     canvas.height = h;
 
-    const sampleEdgeBackground = () => {
+    const syncExactBg = () => {
       if (video.readyState < 2 || video.paused) return;
 
       try {
@@ -61,20 +53,15 @@ export default function HomePage() {
         let bSum = 0;
         let count = 0;
 
-        // Sample top, left, and right outer border strip pixels (avoids bright kitten & hand)
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
-            const isEdge = x < 3 || x >= w - 3 || y < 3;
-            if (!isEdge) continue;
+            const isOuterEdge = x < 2 || x >= w - 2 || y < 2 || y >= h - 2;
+            if (!isOuterEdge) continue;
 
             const idx = (y * w + x) * 4;
-            const r = data[idx];
-            const g = data[idx + 1];
-            const b = data[idx + 2];
-
-            rSum += r;
-            gSum += g;
-            bSum += b;
+            rSum += data[idx];
+            gSum += data[idx + 1];
+            bSum += data[idx + 2];
             count += 1;
           }
         }
@@ -83,62 +70,50 @@ export default function HomePage() {
           const r = Math.round(rSum / count);
           const g = Math.round(gSum / count);
           const b = Math.round(bSum / count);
-
-          const dr = Math.max(8, Math.round(r * 0.72));
-          const dg = Math.max(8, Math.round(g * 0.72));
-          const db = Math.max(8, Math.round(b * 0.72));
-
-          setBg({
-            solid: `rgb(${r}, ${g}, ${b})`,
-            vignette: `rgb(${dr}, ${dg}, ${db})`,
-          });
+          setBgColor(`rgb(${r}, ${g}, ${b})`);
         }
       } catch {
         // Ignored
       }
     };
 
-    const interval = window.setInterval(sampleEdgeBackground, 250);
+    const interval = window.setInterval(syncExactBg, 250);
     return () => window.clearInterval(interval);
   }, []);
 
   return (
     <div
-      className="min-h-screen w-full text-slate-100 flex flex-col items-center justify-center px-4 py-12 relative transition-colors duration-500"
-      style={{ backgroundColor: bg.solid }}
+      className="min-h-screen w-full text-slate-100 flex flex-col items-center justify-center px-4 py-10 relative transition-colors duration-300"
+      style={{ backgroundColor: bgColor }}
     >
-      {/* Full-viewport background fill matching the video's own background color */}
+      {/* Single unified full-viewport background matching the sampled video edge color */}
       <div
         aria-hidden="true"
-        className="fixed inset-0 w-screen h-screen -z-10 transition-colors duration-500"
-        style={{
-          background: `radial-gradient(circle at 50% 42%, ${bg.solid} 0%, ${bg.vignette} 100%)`,
-        }}
+        className="fixed inset-0 w-screen h-screen -z-10 transition-colors duration-300"
+        style={{ backgroundColor: bgColor }}
       />
 
       <canvas ref={sampleCanvasRef} className="hidden" aria-hidden="true" />
 
-      <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center space-y-7">
-        {/* Clean, borderless animated DP video */}
-        <div className="relative flex items-center justify-center">
-          <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-full overflow-hidden relative shadow-none border-0 ring-0">
-            <video
-              ref={dpVideoRef}
-              src="/videos/sweetie-dp.mp4"
-              autoPlay
-              loop
-              muted={muted}
-              playsInline
-              className="w-full h-full object-cover border-0 outline-none"
-            />
-          </div>
+      <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center space-y-6">
+        {/* Full uncropped video as-is without circle crop or border */}
+        <div className="relative inline-flex items-center justify-center">
+          <video
+            ref={dpVideoRef}
+            src="/videos/sweetie-dp.mp4"
+            autoPlay
+            loop
+            muted={muted}
+            playsInline
+            className="max-h-72 sm:max-h-80 w-auto max-w-full rounded-2xl block border-0 outline-none shadow-none"
+          />
 
           <button
             type="button"
             onClick={() => setMuted((prev) => !prev)}
             aria-label={muted ? "Unmute DP video" : "Mute DP video"}
             title={muted ? "Unmute sound" : "Mute sound"}
-            className="absolute bottom-1.5 right-1.5 w-9 h-9 rounded-full bg-black/45 hover:bg-black/70 text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="absolute bottom-2.5 right-2.5 w-9 h-9 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
@@ -146,7 +121,7 @@ export default function HomePage() {
 
         {/* Title & Subtitle */}
         <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-black/25 text-xs font-mono text-rose-200">
+          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-black/20 text-xs font-mono text-rose-200">
             <Sparkles size={13} />
             <span>Parvati • Sweetie🌸</span>
           </div>
@@ -176,7 +151,7 @@ export default function HomePage() {
             href="https://ig.me/m/parvatisingh3118"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-black/25 hover:bg-black/40 text-white font-mono text-xs font-bold transition-all"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-black/20 hover:bg-black/35 text-white font-mono text-xs font-bold transition-all"
           >
             <MessageCircle size={15} />
             <span>@parvatisingh3118</span>
@@ -184,7 +159,7 @@ export default function HomePage() {
 
           <Link
             href="/admin"
-            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-black/25 hover:bg-black/40 text-slate-200 font-mono text-xs font-bold transition-all"
+            className="inline-flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-black/20 hover:bg-black/35 text-slate-200 font-mono text-xs font-bold transition-all"
           >
             <Shield size={14} />
             <span>Admin</span>
