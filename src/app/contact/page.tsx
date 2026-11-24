@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageCircle, Heart, Send, CheckCircle2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
+import {
+  MessageCircle,
+  Heart,
+  Send,
+  CheckCircle2,
+  Lock,
+  LogIn,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface RosePetal {
@@ -27,6 +36,20 @@ const PETAL_COLORS = [
   { base: "#fda4af", edge: "#f43f5e", highlight: "#fff1f2" },
   { base: "#f9a8d4", edge: "#ec4899", highlight: "#fdf2f8" },
 ];
+
+function getGoogleDisplayName(user: User | null): string {
+  if (!user) return "";
+  const meta = user.user_metadata || {};
+  const fullName =
+    typeof meta.full_name === "string" && meta.full_name.trim()
+      ? meta.full_name.trim()
+      : typeof meta.name === "string" && meta.name.trim()
+      ? meta.name.trim()
+      : "";
+  if (fullName) return fullName;
+  if (user.email) return user.email.split("@")[0];
+  return "Google User";
+}
 
 function drawLovelyPetalWithShadow(ctx: CanvasRenderingContext2D, p: RosePetal) {
   ctx.save();
@@ -79,13 +102,39 @@ function drawLovelyPetalWithShadow(ctx: CanvasRenderingContext2D, p: RosePetal) 
 }
 
 export default function ContactPage() {
-  const [senderName, setSenderName] = useState("");
+  const router = useRouter();
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [senderNote, setSenderNote] = useState("");
   const [sending, setSending] = useState(false);
   const [statusText, setStatusText] = useState<string | null>(null);
 
   const petalCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const petalsRef = useRef<RosePetal[]>([]);
+
+  const googleName = getGoogleDisplayName(authUser);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      setAuthUser(data?.user ?? null);
+      setAuthChecked(true);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = petalCanvasRef.current;
@@ -174,7 +223,12 @@ export default function ContactPage() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = senderName.trim().slice(0, 50) || "Guest";
+    if (!authUser) {
+      router.push("/ai");
+      return;
+    }
+
+    const fixedGoogleName = getGoogleDisplayName(authUser).slice(0, 60);
     const cleanMsg = senderNote.trim().slice(0, 500);
     if (!cleanMsg || sending) return;
 
@@ -185,7 +239,7 @@ export default function ContactPage() {
     try {
       const localRecord = {
         id: `contact-${Date.now()}`,
-        sender_name: cleanName,
+        sender_name: fixedGoogleName,
         message: cleanMsg,
         created_at: createdAt,
       };
@@ -202,18 +256,16 @@ export default function ContactPage() {
 
       await supabase.from("parvati_contact_messages").insert([
         {
-          sender_name: cleanName,
+          sender_name: fixedGoogleName,
           message: cleanMsg,
           created_at: createdAt,
         },
       ]);
 
       setStatusText("Sent to Parvati");
-      setSenderName("");
       setSenderNote("");
     } catch {
       setStatusText("Sent to Parvati");
-      setSenderName("");
       setSenderNote("");
     } finally {
       setSending(false);
@@ -254,39 +306,61 @@ export default function ContactPage() {
           </a>
         </div>
 
-        <form onSubmit={handleSend} className="space-y-3">
-          <input
-            type="text"
-            value={senderName}
-            onChange={(e) => setSenderName(e.target.value)}
-            placeholder="Your name..."
-            className="w-full px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950"
-          />
-          <textarea
-            rows={3}
-            value={senderNote}
-            onChange={(e) => setSenderNote(e.target.value)}
-            placeholder="Write your message..."
-            className="w-full px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950"
-          />
-          <div className="flex items-center justify-between gap-3">
-            {statusText ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-mono text-pink-700 font-bold">
-                <CheckCircle2 size={14} /> {statusText}
-              </span>
-            ) : (
-              <span />
-            )}
+        {!authChecked ? (
+          <div className="p-4 rounded-2xl bg-[#fff8f3] border border-pink-200 text-xs font-mono text-rose-700 text-center">
+            Checking Google login status...
+          </div>
+        ) : !authUser ? (
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-[#fff8f3] to-pink-50 border border-pink-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+            <p className="text-xs text-rose-900 font-medium">
+              Please sign in with your Google account to send a message to
+              Parvati.
+            </p>
             <button
-              type="submit"
-              disabled={sending || !senderNote.trim()}
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              type="button"
+              onClick={() => router.push("/ai")}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer shrink-0"
             >
-              <Send size={13} />
-              <span>{sending ? "Sending..." : "Send"}</span>
+              <LogIn size={13} />
+              <span>Login with Google</span>
             </button>
           </div>
-        </form>
+        ) : (
+          <form onSubmit={handleSend} className="space-y-3">
+            <div
+              title="Name synced from your Google account"
+              className="w-full px-4 py-2.5 rounded-2xl bg-pink-50/90 border border-pink-200 text-xs font-mono font-bold text-pink-900 flex items-center justify-between gap-2 select-none"
+            >
+              <span>Sending as: {googleName}</span>
+              <Lock size={13} className="text-pink-500 shrink-0" />
+            </div>
+
+            <textarea
+              rows={3}
+              value={senderNote}
+              onChange={(e) => setSenderNote(e.target.value)}
+              placeholder="Write your message..."
+              className="w-full px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950"
+            />
+            <div className="flex items-center justify-between gap-3">
+              {statusText ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-mono text-pink-700 font-bold">
+                  <CheckCircle2 size={14} /> {statusText}
+                </span>
+              ) : (
+                <span />
+              )}
+              <button
+                type="submit"
+                disabled={sending || !senderNote.trim()}
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Send size={13} />
+                <span>{sending ? "Sending..." : "Send"}</span>
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

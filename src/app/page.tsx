@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import type { User } from "@supabase/supabase-js";
 import {
   Volume2,
   VolumeX,
@@ -9,6 +11,8 @@ import {
   Send,
   ThumbsUp,
   RefreshCw,
+  Lock,
+  LogIn,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -52,6 +56,20 @@ const PETAL_COLORS = [
   { base: "#fda4af", edge: "#f43f5e", highlight: "#fff1f2" },
   { base: "#f9a8d4", edge: "#ec4899", highlight: "#fdf2f8" },
 ];
+
+function getGoogleDisplayName(user: User | null): string {
+  if (!user) return "";
+  const meta = user.user_metadata || {};
+  const fullName =
+    typeof meta.full_name === "string" && meta.full_name.trim()
+      ? meta.full_name.trim()
+      : typeof meta.name === "string" && meta.name.trim()
+      ? meta.name.trim()
+      : "";
+  if (fullName) return fullName;
+  if (user.email) return user.email.split("@")[0];
+  return "Google User";
+}
 
 function formatMessageDateTime(iso: string): string {
   const dt = new Date(iso);
@@ -117,11 +135,14 @@ function drawLovelyPetalWithShadow(ctx: CanvasRenderingContext2D, p: RosePetal) 
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
   const [muted, setMuted] = useState(true);
   const [noteIdx, setNoteIdx] = useState(0);
   const [dpSrc, setDpSrc] = useState("/parvati.jpg");
 
-  const [guestName, setGuestName] = useState("");
   const [guestMessage, setGuestMessage] = useState("");
   const [entries, setEntries] = useState<GuestbookEntry[]>([]);
   const [likedIds, setLikedIds] = useState<string[]>([]);
@@ -132,6 +153,29 @@ export default function HomePage() {
   const dpVideoRef = useRef<HTMLVideoElement | null>(null);
   const petalCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const petalsRef = useRef<RosePetal[]>([]);
+
+  const googleName = getGoogleDisplayName(authUser);
+
+  useEffect(() => {
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (!active) return;
+      setAuthUser(data?.user ?? null);
+      setAuthChecked(true);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+      setAuthChecked(true);
+    });
+
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     if (dpVideoRef.current) {
@@ -286,7 +330,12 @@ export default function HomePage() {
 
   const handleGuestbookSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanName = guestName.trim().slice(0, 40) || "Guest";
+    if (!authUser) {
+      router.push("/ai");
+      return;
+    }
+
+    const fixedGoogleName = getGoogleDisplayName(authUser).slice(0, 60);
     const cleanMsg = guestMessage.trim().slice(0, 240);
     if (!cleanMsg || submitting) return;
 
@@ -295,7 +344,7 @@ export default function HomePage() {
     const tempId = `temp-${Date.now()}`;
     const optimisticEntry: GuestbookEntry = {
       id: tempId,
-      name: cleanName,
+      name: fixedGoogleName,
       message: cleanMsg,
       created_at: createdIso,
       likes: 0,
@@ -303,7 +352,6 @@ export default function HomePage() {
 
     const optimisticList = [optimisticEntry, ...entries];
     setEntries(optimisticList);
-    setGuestName("");
     setGuestMessage("");
 
     try {
@@ -311,7 +359,7 @@ export default function HomePage() {
         .from("parvati_guestbook")
         .insert([
           {
-            name: cleanName,
+            name: fixedGoogleName,
             message: cleanMsg,
             likes: 0,
             created_at: createdIso,
@@ -754,35 +802,55 @@ export default function HomePage() {
             </div>
           </div>
 
-          <form onSubmit={handleGuestbookSubmit} className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <input
-                type="text"
-                value={guestName}
-                onChange={(e) => setGuestName(e.target.value)}
-                placeholder="Your name..."
-                className="px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950 placeholder:text-rose-400/70"
-              />
-              <input
-                type="text"
-                value={guestMessage}
-                onChange={(e) => setGuestMessage(e.target.value)}
-                placeholder="Write a sweet message..."
-                className="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950 placeholder:text-rose-400/70"
-              />
+          {!authChecked ? (
+            <div className="p-4 rounded-2xl bg-[#fff8f3] border border-pink-200 text-xs font-mono text-rose-700 text-center">
+              Checking Google login status...
             </div>
-
-            <div className="flex justify-end">
+          ) : !authUser ? (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#fff8f3] to-pink-50 border border-pink-200 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-rose-900 font-medium">
+                Sign in with your Google account to post a guestbook message.
+              </p>
               <button
-                type="submit"
-                disabled={submitting || !guestMessage.trim()}
-                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                type="button"
+                onClick={() => router.push("/ai")}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer"
               >
-                <Send size={13} />
-                <span>{submitting ? "Posting..." : "Post Note"}</span>
+                <LogIn size={13} />
+                <span>Login with Google</span>
               </button>
             </div>
-          </form>
+          ) : (
+            <form onSubmit={handleGuestbookSubmit} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div
+                  title="Name synced from your Google account"
+                  className="px-4 py-2.5 rounded-2xl bg-pink-50/90 border border-pink-200 text-xs font-mono font-bold text-pink-900 flex items-center justify-between gap-2 select-none"
+                >
+                  <span className="truncate">{googleName}</span>
+                  <Lock size={12} className="text-pink-500 shrink-0" />
+                </div>
+                <input
+                  type="text"
+                  value={guestMessage}
+                  onChange={(e) => setGuestMessage(e.target.value)}
+                  placeholder="Write a sweet message..."
+                  className="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950 placeholder:text-rose-400/70"
+                />
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={submitting || !guestMessage.trim()}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Send size={13} />
+                  <span>{submitting ? "Posting..." : "Post Note"}</span>
+                </button>
+              </div>
+            </form>
+          )}
 
           {/* All Guestbook Messages from parvati_guestbook */}
           <div className="space-y-2.5 max-h-72 overflow-y-auto pt-3 border-t border-pink-100 pr-1">
