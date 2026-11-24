@@ -37,6 +37,7 @@ interface SweetieSessionRow {
   started_at?: string | null;
   login_at?: string | null;
   ended_at?: string | null;
+  last_active_at?: string | null;
   created_at?: string | null;
   [key: string]: unknown;
 }
@@ -297,10 +298,10 @@ export default function AdminUserQuestionsPanel() {
       const sortedSessions = [...rawSessions].sort(
         (a, b) =>
           new Date(
-            b.started_at || b.login_at || b.created_at || 0
+            String(b.started_at ?? b.login_at ?? b.created_at ?? 0)
           ).getTime() -
           new Date(
-            a.started_at || a.login_at || a.created_at || 0
+            String(a.started_at ?? a.login_at ?? a.created_at ?? 0)
           ).getTime()
       );
 
@@ -628,10 +629,14 @@ export default function AdminUserQuestionsPanel() {
                     {formatDuration(s.duration_seconds)}
                   </td>
                   <td className="p-3 text-slate-600">
-                    {formatDateTime(s.started_at || s.login_at)}
+                    {formatDateTime(
+                      String(s.started_at ?? s.login_at ?? "") || null
+                    )}
                   </td>
                   <td className="p-3 text-slate-600">
-                    {formatDateTime(s.ended_at || s.last_active_at)}
+                    {formatDateTime(
+                      String(s.ended_at ?? s.last_active_at ?? "") || null
+                    )}
                   </td>
                 </tr>
               ))}
