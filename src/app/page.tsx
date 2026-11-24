@@ -9,7 +9,6 @@ import {
   Send,
   ThumbsUp,
   RefreshCw,
-  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -147,7 +146,6 @@ export default function HomePage() {
     return () => window.clearInterval(interval);
   }, []);
 
-  // Continuous slow-falling rose petals with soft shadows
   useEffect(() => {
     const canvas = petalCanvasRef.current;
     if (!canvas) return;
@@ -417,13 +415,22 @@ export default function HomePage() {
           }
         }
 
+        @keyframes borderOrbit {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+
         @keyframes cuteNameFloat {
           0%,
           100% {
             transform: translate3d(0, 0, 0) scale(1);
           }
           50% {
-            transform: translate3d(0, -5px, 0) scale(1.03);
+            transform: translate3d(0, -4px, 0) scale(1.025);
           }
         }
 
@@ -472,6 +479,36 @@ export default function HomePage() {
           animation: lovelyGlow 6s ease infinite;
         }
 
+        .thin-rotating-name-shell {
+          position: relative;
+          overflow: hidden;
+          border-radius: 9999px;
+          padding: 2px;
+        }
+
+        .thin-rotating-name-beam {
+          position: absolute;
+          inset: -160%;
+          background: conic-gradient(
+            from 0deg,
+            #ec4899,
+            #f59e0b,
+            #fb7185,
+            #fde68a,
+            #e11d48,
+            #ec4899
+          );
+          animation: borderOrbit 4.5s linear infinite;
+        }
+
+        .thin-rotating-name-inner {
+          position: relative;
+          z-index: 1;
+          border-radius: 9999px;
+          background: rgba(255, 253, 249, 0.94);
+          padding: 0.45rem 1.25rem;
+        }
+
         .hd-animated-name {
           background: linear-gradient(
             110deg,
@@ -490,8 +527,6 @@ export default function HomePage() {
           text-rendering: geometricPrecision;
           animation: lovelyGlow 5s cubic-bezier(0.4, 0, 0.2, 1) infinite,
             cuteNameFloat 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-          filter: drop-shadow(0 6px 16px rgba(190, 24, 93, 0.28))
-            drop-shadow(0 1px 1px rgba(255, 255, 255, 0.85));
         }
 
         .hd-smooth-text {
@@ -567,7 +602,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Center: Borderless Animated Name with High-Contrast Smooth Flowers */}
+          {/* Center: Continuously Rotating Thin Border Around Kumari Parvati Singh */}
           <div className="flex flex-col items-center justify-center space-y-2.5 px-3 py-3">
             <div
               aria-hidden="true"
@@ -584,22 +619,25 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="relative flex items-center justify-center gap-2">
-              <span
-                aria-hidden="true"
-                className="hd-flower-4k flower-sway-left text-lg sm:text-xl select-none"
-              >
-                🌸
-              </span>
-              <h1 className="text-3xl sm:text-4xl font-heading font-extrabold tracking-tight hd-animated-name leading-tight">
-                Kumari Parvati Singh
-              </h1>
-              <span
-                aria-hidden="true"
-                className="hd-flower-4k flower-sway-right text-lg sm:text-xl select-none"
-              >
-                🌸
-              </span>
+            <div className="thin-rotating-name-shell shadow-sm shadow-pink-200/70">
+              <div aria-hidden="true" className="thin-rotating-name-beam" />
+              <div className="thin-rotating-name-inner flex items-center justify-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="hd-flower-4k flower-sway-left text-base sm:text-lg select-none"
+                >
+                  🌸
+                </span>
+                <h1 className="text-2xl sm:text-3xl font-heading font-extrabold tracking-tight hd-animated-name leading-tight whitespace-nowrap">
+                  Kumari Parvati Singh
+                </h1>
+                <span
+                  aria-hidden="true"
+                  className="hd-flower-4k flower-sway-right text-base sm:text-lg select-none"
+                >
+                  🌸
+                </span>
+              </div>
             </div>
 
             <div
@@ -685,8 +723,8 @@ export default function HomePage() {
               <BookOpen size={15} />
               <span>Guestbook ({entries.length})</span>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100/90 border border-amber-200 text-rose-700 text-[10px]">
-                <Sparkles size={11} className="text-pink-500" /> {totalLikes}{" "}
-                likes
+                <Heart size={11} className="fill-pink-500 text-pink-500" />{" "}
+                {totalLikes} likes
               </span>
             </div>
 
