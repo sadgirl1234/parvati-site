@@ -27,7 +27,7 @@ export default function HomePage() {
     }
   }, [muted]);
 
-  // Sample outer edge pixels of the video frame so the entire screen uses one exact synced background color
+  // Sample outer edge pixels of the video frame so the surrounding background matches the video's exact color
   useEffect(() => {
     const canvas = sampleCanvasRef.current;
     const video = dpVideoRef.current;
@@ -55,7 +55,7 @@ export default function HomePage() {
 
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
-            const isOuterEdge = x < 2 || x >= w - 2 || y < 2 || y >= h - 2;
+            const isOuterEdge = x < 2 || x >= w - 2 || y < 2;
             if (!isOuterEdge) continue;
 
             const idx = (y * w + x) * 4;
@@ -81,12 +81,15 @@ export default function HomePage() {
     return () => window.clearInterval(interval);
   }, []);
 
+  const featheredEdgeMask =
+    "radial-gradient(ellipse 74% 76% at 50% 48%, #000 56%, rgba(0,0,0,0.65) 76%, transparent 100%)";
+
   return (
     <div
       className="min-h-screen w-full text-slate-100 flex flex-col items-center justify-center px-4 py-10 relative transition-colors duration-300"
       style={{ backgroundColor: bgColor }}
     >
-      {/* Single unified full-viewport background matching the sampled video edge color */}
+      {/* Full-viewport single background layer */}
       <div
         aria-hidden="true"
         className="fixed inset-0 w-screen h-screen -z-10 transition-colors duration-300"
@@ -96,24 +99,32 @@ export default function HomePage() {
       <canvas ref={sampleCanvasRef} className="hidden" aria-hidden="true" />
 
       <div className="relative z-10 max-w-xl w-full flex flex-col items-center text-center space-y-6">
-        {/* Full uncropped video as-is without circle crop or border */}
-        <div className="relative inline-flex items-center justify-center">
-          <video
-            ref={dpVideoRef}
-            src="/videos/sweetie-dp.mp4"
-            autoPlay
-            loop
-            muted={muted}
-            playsInline
-            className="max-h-72 sm:max-h-80 w-auto max-w-full rounded-2xl block border-0 outline-none shadow-none"
-          />
+        {/* Zoomed video with feathered edges merged seamlessly into the surrounding background */}
+        <div className="relative flex items-center justify-center overflow-hidden w-72 h-80 sm:w-80 sm:h-96">
+          <div
+            className="w-full h-full flex items-center justify-center"
+            style={{
+              maskImage: featheredEdgeMask,
+              WebkitMaskImage: featheredEdgeMask,
+            }}
+          >
+            <video
+              ref={dpVideoRef}
+              src="/videos/sweetie-dp.mp4"
+              autoPlay
+              loop
+              muted={muted}
+              playsInline
+              className="w-full h-full object-contain scale-[1.22] border-0 outline-none shadow-none"
+            />
+          </div>
 
           <button
             type="button"
             onClick={() => setMuted((prev) => !prev)}
             aria-label={muted ? "Unmute DP video" : "Mute DP video"}
             title={muted ? "Unmute sound" : "Mute sound"}
-            className="absolute bottom-2.5 right-2.5 w-9 h-9 rounded-full bg-black/50 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="absolute bottom-3 right-3 z-20 w-9 h-9 rounded-full bg-black/45 hover:bg-black/75 text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
           </button>
