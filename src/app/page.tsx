@@ -417,45 +417,45 @@ export default function HomePage() {
           }
         }
 
-        @keyframes cuteNameBounce {
+        @keyframes cuteNameFloat {
           0%,
           100% {
-            transform: translateY(0px) scale(1);
+            transform: translate3d(0, 0, 0) scale(1);
           }
           50% {
-            transform: translateY(-4px) scale(1.025);
+            transform: translate3d(0, -5px, 0) scale(1.03);
           }
         }
 
-        @keyframes flowerBobLeft {
+        @keyframes smoothFlowerSwayLeft {
           0%,
           100% {
-            transform: translateY(0px) rotate(-12deg) scale(1);
+            transform: translate3d(0, 0, 0) rotate(-10deg) scale(1);
           }
           50% {
-            transform: translateY(-6px) rotate(12deg) scale(1.12);
+            transform: translate3d(0, -6px, 0) rotate(12deg) scale(1.1);
           }
         }
 
-        @keyframes flowerBobRight {
+        @keyframes smoothFlowerSwayRight {
           0%,
           100% {
-            transform: translateY(0px) rotate(12deg) scale(1);
+            transform: translate3d(0, 0, 0) rotate(10deg) scale(1);
           }
           50% {
-            transform: translateY(-6px) rotate(-12deg) scale(1.12);
+            transform: translate3d(0, -6px, 0) rotate(-12deg) scale(1.1);
           }
         }
 
-        @keyframes flowerSpinGentle {
+        @keyframes smoothBloomTurn {
           0% {
-            transform: rotate(0deg) scale(1);
+            transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
           }
           50% {
-            transform: rotate(180deg) scale(1.15);
+            transform: translate3d(0, -4px, 0) rotate(180deg) scale(1.14);
           }
           100% {
-            transform: rotate(360deg) scale(1);
+            transform: translate3d(0, 0, 0) rotate(360deg) scale(1);
           }
         }
 
@@ -472,34 +472,56 @@ export default function HomePage() {
           animation: lovelyGlow 6s ease infinite;
         }
 
-        .cute-animated-name {
+        .hd-animated-name {
           background: linear-gradient(
-            90deg,
-            #ec4899,
-            #e11d48,
-            #f472b6,
-            #d97706,
-            #db2777,
-            #ec4899
+            110deg,
+            #be123c 0%,
+            #db2777 24%,
+            #f43f5e 48%,
+            #b45309 72%,
+            #9d174d 100%
           );
           background-size: 260% 260%;
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
-          animation: lovelyGlow 5s ease infinite, cuteNameBounce 3.4s ease-in-out infinite;
-          filter: drop-shadow(0 4px 14px rgba(236, 72, 153, 0.25));
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: geometricPrecision;
+          animation: lovelyGlow 5s cubic-bezier(0.4, 0, 0.2, 1) infinite,
+            cuteNameFloat 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+          filter: drop-shadow(0 6px 16px rgba(190, 24, 93, 0.28))
+            drop-shadow(0 1px 1px rgba(255, 255, 255, 0.85));
         }
 
-        .flower-left {
-          animation: flowerBobLeft 3.2s ease-in-out infinite;
+        .hd-smooth-text {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          text-rendering: geometricPrecision;
         }
 
-        .flower-right {
-          animation: flowerBobRight 3.2s ease-in-out infinite 0.8s;
+        .hd-flower-4k {
+          -webkit-font-smoothing: antialiased;
+          text-rendering: geometricPrecision;
+          will-change: transform;
+          filter: contrast(1.18) saturate(1.28)
+            drop-shadow(0 6px 12px rgba(157, 23, 77, 0.34))
+            drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
         }
 
-        .flower-spin {
-          animation: flowerSpinGentle 8s linear infinite;
+        .flower-sway-left {
+          animation: smoothFlowerSwayLeft 3.4s cubic-bezier(0.4, 0, 0.2, 1)
+            infinite;
+        }
+
+        .flower-sway-right {
+          animation: smoothFlowerSwayRight 3.4s cubic-bezier(0.4, 0, 0.2, 1)
+            infinite 0.85s;
+        }
+
+        .flower-bloom-spin {
+          animation: smoothBloomTurn 8.5s cubic-bezier(0.4, 0, 0.2, 1)
+            infinite;
         }
       `}</style>
 
@@ -525,7 +547,7 @@ export default function HomePage() {
       />
 
       <div className="relative z-10 max-w-5xl w-full flex flex-col items-center text-center space-y-8">
-        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | parvati.jpg (Right) */}
+        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center, Borderless) | parvati.jpg (Right) */}
         <div className="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-4">
           {/* Left: Rounded Lovely Video DP */}
           <div className="flex flex-col items-center justify-center">
@@ -554,30 +576,36 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Center: Full Name with Animated Flowers & Lovable Cute Look */}
-          <div className="flex flex-col items-center justify-center space-y-2.5 px-5 py-6 rounded-3xl bg-[#fffdf9]/90 border-2 border-pink-200/90 shadow-md shadow-pink-100/80 backdrop-blur-sm relative">
+          {/* Center: Borderless Animated Name with High-Contrast Smooth Flowers */}
+          <div className="flex flex-col items-center justify-center space-y-2.5 px-3 py-3">
             <div
               aria-hidden="true"
-              className="flex items-center justify-center gap-2 text-lg sm:text-xl select-none"
+              className="flex items-center justify-center gap-3 text-xl sm:text-2xl select-none"
             >
-              <span className="flower-left inline-block">🌷</span>
-              <span className="flower-spin inline-block">🌸</span>
-              <span className="flower-right inline-block">🌺</span>
+              <span className="hd-flower-4k flower-sway-left inline-block">
+                🌷
+              </span>
+              <span className="hd-flower-4k flower-bloom-spin inline-block">
+                🌸
+              </span>
+              <span className="hd-flower-4k flower-sway-right inline-block">
+                🌺
+              </span>
             </div>
 
-            <div className="relative flex items-center justify-center gap-1.5">
+            <div className="relative flex items-center justify-center gap-2">
               <span
                 aria-hidden="true"
-                className="flower-left text-base sm:text-lg select-none"
+                className="hd-flower-4k flower-sway-left text-lg sm:text-xl select-none"
               >
                 🌸
               </span>
-              <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight cute-animated-name leading-tight">
+              <h1 className="text-3xl sm:text-4xl font-heading font-extrabold tracking-tight hd-animated-name leading-tight">
                 Kumari Parvati Singh
               </h1>
               <span
                 aria-hidden="true"
-                className="flower-right text-base sm:text-lg select-none"
+                className="hd-flower-4k flower-sway-right text-lg sm:text-xl select-none"
               >
                 🌸
               </span>
@@ -585,17 +613,20 @@ export default function HomePage() {
 
             <div
               aria-hidden="true"
-              className="flex items-center justify-center gap-2 text-xs sm:text-sm select-none"
+              className="flex items-center justify-center gap-3 text-sm sm:text-base select-none"
             >
-              <span className="flower-right inline-block">🌼</span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-pink-100/80 text-pink-700 font-mono text-[10px] font-bold">
-                <Heart size={10} className="fill-pink-500 text-pink-500" />
-                <span>Sweet &amp; Lovely</span>
+              <span className="hd-flower-4k flower-sway-right inline-block">
+                🌼
               </span>
-              <span className="flower-left inline-block">🌼</span>
+              <span className="hd-flower-4k flower-sway-left inline-block">
+                🌹
+              </span>
+              <span className="hd-flower-4k flower-sway-right inline-block">
+                🌼
+              </span>
             </div>
 
-            <p className="text-xs sm:text-sm text-rose-900/75 max-w-xs leading-relaxed">
+            <p className="hd-smooth-text text-xs sm:text-sm font-medium text-rose-950/85 max-w-xs leading-relaxed">
               Warm vibes, playful moments, and sweet conversations anytime.
             </p>
           </div>
@@ -626,7 +657,7 @@ export default function HomePage() {
             <span>Love Notes</span>
           </div>
 
-          <p className="text-sm sm:text-base text-rose-950/85 italic leading-relaxed">
+          <p className="hd-smooth-text text-sm sm:text-base text-rose-950/85 italic leading-relaxed">
             &ldquo;{LOVE_NOTES[noteIdx]}&rdquo;
           </p>
 
@@ -741,7 +772,7 @@ export default function HomePage() {
                       </span>
                     </div>
 
-                    <p className="text-xs text-rose-950/85 leading-relaxed">
+                    <p className="hd-smooth-text text-xs text-rose-950/85 leading-relaxed">
                       {item.message}
                     </p>
 
