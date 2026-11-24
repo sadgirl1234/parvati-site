@@ -82,7 +82,7 @@ export default function HomePage() {
         .from("parvati_guestbook")
         .select("id, name, message, likes, created_at")
         .order("created_at", { ascending: false })
-        .limit(100);
+        .limit(200);
 
       if (Array.isArray(data)) {
         const rows = data as GuestbookEntry[];
@@ -237,7 +237,8 @@ export default function HomePage() {
 
   const displayedEntries = [...entries].sort((a, b) => {
     if (sortBy === "likes") {
-      const diff = Math.max(0, Number(b.likes ?? 0)) - Math.max(0, Number(a.likes ?? 0));
+      const diff =
+        Math.max(0, Number(b.likes ?? 0)) - Math.max(0, Number(a.likes ?? 0));
       if (diff !== 0) return diff;
     }
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -289,7 +290,7 @@ export default function HomePage() {
       `}</style>
 
       <div className="relative z-10 max-w-5xl w-full flex flex-col items-center text-center space-y-8">
-        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | Navbar Avatar Image (Right) */}
+        {/* Top Showcase Row: Video DP (Left) | Kumari Parvati Singh (Center) | parvati.jpg (Right) */}
         <div className="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-4">
           {/* Left: Animated Video DP with Animated Border */}
           <div className="flex flex-col items-center justify-center">
@@ -329,7 +330,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          {/* Right: Same Avatar Image as Navigation Bar */}
+          {/* Right: parvati.jpg Profile Image */}
           <div className="flex flex-col items-center justify-center">
             <div className="relative p-1.5 rounded-full animated-dp-border shadow-xl">
               <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-rose-50 relative">
@@ -339,8 +340,6 @@ export default function HomePage() {
                   onError={() => {
                     if (dpSrc === "/parvati.jpg") {
                       setDpSrc("/parvati.png");
-                    } else if (dpSrc === "/parvati.png") {
-                      setDpSrc("/images/parvati.jpg");
                     }
                   }}
                   className="w-full h-full object-cover"
@@ -398,7 +397,7 @@ export default function HomePage() {
           </a>
         </div>
 
-        {/* Guestbook Form + Messages with Likes, Sorting, Refresh, and Full Date & Time */}
+        {/* Guestbook Form + Messages from parvati_guestbook */}
         <div className="max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-white/95 border border-rose-200/80 shadow-md space-y-4 text-left">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-rose-600">
