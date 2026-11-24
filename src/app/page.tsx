@@ -73,7 +73,6 @@ function drawLovelyPetalWithShadow(ctx: CanvasRenderingContext2D, p: RosePetal) 
   ctx.rotate(p.rotation);
   ctx.globalAlpha = p.alpha;
 
-  // Soft rose & warm blush drop shadow beneath each petal
   ctx.shadowColor = "rgba(190, 24, 93, 0.24)";
   ctx.shadowBlur = Math.max(8, p.size * 0.9);
   ctx.shadowOffsetX = 2;
@@ -107,7 +106,6 @@ function drawLovelyPetalWithShadow(ctx: CanvasRenderingContext2D, p: RosePetal) 
   ctx.closePath();
   ctx.fill();
 
-  // Subtle vein highlight without extra shadow
   ctx.shadowColor = "transparent";
   ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
   ctx.lineWidth = 0.85;
@@ -419,6 +417,48 @@ export default function HomePage() {
           }
         }
 
+        @keyframes cuteNameBounce {
+          0%,
+          100% {
+            transform: translateY(0px) scale(1);
+          }
+          50% {
+            transform: translateY(-4px) scale(1.025);
+          }
+        }
+
+        @keyframes flowerBobLeft {
+          0%,
+          100% {
+            transform: translateY(0px) rotate(-12deg) scale(1);
+          }
+          50% {
+            transform: translateY(-6px) rotate(12deg) scale(1.12);
+          }
+        }
+
+        @keyframes flowerBobRight {
+          0%,
+          100% {
+            transform: translateY(0px) rotate(12deg) scale(1);
+          }
+          50% {
+            transform: translateY(-6px) rotate(-12deg) scale(1.12);
+          }
+        }
+
+        @keyframes flowerSpinGentle {
+          0% {
+            transform: rotate(0deg) scale(1);
+          }
+          50% {
+            transform: rotate(180deg) scale(1.15);
+          }
+          100% {
+            transform: rotate(360deg) scale(1);
+          }
+        }
+
         .lovely-ring {
           background: linear-gradient(
             135deg,
@@ -432,20 +472,34 @@ export default function HomePage() {
           animation: lovelyGlow 6s ease infinite;
         }
 
-        .lovely-name-gradient {
+        .cute-animated-name {
           background: linear-gradient(
             90deg,
-            #db2777,
-            #e11d48,
             #ec4899,
+            #e11d48,
+            #f472b6,
             #d97706,
-            #db2777
+            #db2777,
+            #ec4899
           );
-          background-size: 240% 240%;
+          background-size: 260% 260%;
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
-          animation: lovelyGlow 6s ease infinite;
+          animation: lovelyGlow 5s ease infinite, cuteNameBounce 3.4s ease-in-out infinite;
+          filter: drop-shadow(0 4px 14px rgba(236, 72, 153, 0.25));
+        }
+
+        .flower-left {
+          animation: flowerBobLeft 3.2s ease-in-out infinite;
+        }
+
+        .flower-right {
+          animation: flowerBobRight 3.2s ease-in-out infinite 0.8s;
+        }
+
+        .flower-spin {
+          animation: flowerSpinGentle 8s linear infinite;
         }
       `}</style>
 
@@ -500,11 +554,46 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Center: Full Name with Lovely Pink-Cream Gradient */}
-          <div className="flex flex-col items-center justify-center space-y-2.5 px-4 py-5 rounded-3xl bg-[#fffdf9]/85 border border-pink-200/80 shadow-sm backdrop-blur-sm">
-            <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight lovely-name-gradient leading-tight">
-              Kumari Parvati Singh
-            </h1>
+          {/* Center: Full Name with Animated Flowers & Lovable Cute Look */}
+          <div className="flex flex-col items-center justify-center space-y-2.5 px-5 py-6 rounded-3xl bg-[#fffdf9]/90 border-2 border-pink-200/90 shadow-md shadow-pink-100/80 backdrop-blur-sm relative">
+            <div
+              aria-hidden="true"
+              className="flex items-center justify-center gap-2 text-lg sm:text-xl select-none"
+            >
+              <span className="flower-left inline-block">🌷</span>
+              <span className="flower-spin inline-block">🌸</span>
+              <span className="flower-right inline-block">🌺</span>
+            </div>
+
+            <div className="relative flex items-center justify-center gap-1.5">
+              <span
+                aria-hidden="true"
+                className="flower-left text-base sm:text-lg select-none"
+              >
+                🌸
+              </span>
+              <h1 className="text-3xl sm:text-4xl font-heading font-bold tracking-tight cute-animated-name leading-tight">
+                Kumari Parvati Singh
+              </h1>
+              <span
+                aria-hidden="true"
+                className="flower-right text-base sm:text-lg select-none"
+              >
+                🌸
+              </span>
+            </div>
+
+            <div
+              aria-hidden="true"
+              className="flex items-center justify-center gap-2 text-xs sm:text-sm select-none"
+            >
+              <span className="flower-right inline-block">🌼</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-pink-100/80 text-pink-700 font-mono text-[10px] font-bold">
+                <Heart size={10} className="fill-pink-500 text-pink-500" />
+                <span>Sweet &amp; Lovely</span>
+              </span>
+              <span className="flower-left inline-block">🌼</span>
+            </div>
 
             <p className="text-xs sm:text-sm text-rose-900/75 max-w-xs leading-relaxed">
               Warm vibes, playful moments, and sweet conversations anytime.
