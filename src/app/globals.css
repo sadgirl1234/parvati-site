@@ -4,7 +4,7 @@
    PARVATI-SITE — FINAL GLOBALS.CSS
    - Full BG: fl-2
    - Rounded Nav Pill, Sub-boxes, Inputs, Buttons & Footer: fl-1
-   - Main White Boxes (Name Pill, Love Notes, Guestbook): fl-3
+   - Main White Boxes (Name Pill, Love Notes Card, Guestbook): fl-3
    - AI Chat Box: Real tiled texture | Bottom Mic/Input Bar: fl-2
    - No borders, ultra-dark 3D shadows, black text shadow (excl. animated)
    ========================================================= */
@@ -82,10 +82,14 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   MAIN WHITE BOXES (NAME PILL, LOVE NOTES, GUESTBOOK) — fl-3
+   MAIN WHITE BOXES (NAME PILL, LOVE NOTES CARD, GUESTBOOK) — fl-3
    ========================================================= */
 main div[class*="rounded-full"]:has(h1),
 main div[class*="rounded-full"]:has(h2),
+main div[class*="rounded-full"]:has(h3),
+main div[class*="rounded"]:has(h1):not(a):not(button),
+main section > div[class*="rounded"]:has(p):not(:has(textarea)):not(:has([class*="overflow-y"])),
+main > div > div[class*="rounded"]:has(p):not(:has(textarea)):not(:has([class*="overflow-y"])),
 main section > div[class*="rounded-2xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
 main section > div[class*="rounded-3xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
 main > div > div[class*="rounded-2xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
@@ -113,7 +117,7 @@ main [class*="backdrop-blur"]:not(:has(textarea)):not(:has([class*="overflow-y"]
 /* =========================================================
    SUB-BOXES, BUTTONS & STANDARD INPUTS — fl-1 + ULTRA DARK SHADOW
    ========================================================= */
-main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(:has(p)),
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main textarea,
 main select,
