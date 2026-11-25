@@ -1,70 +1,68 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-heading: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono), ui-monospace, SFMono-Regular, monospace;
+/* =========================================================
+   PARVATI-SITE — HOMEPAGE FLUFFY TEXTURES (fl-1 & fl-2)
+   - fl-2: Entire homepage background
+   - fl-1: Navigation bar & boxes inside the homepage
+   ========================================================= */
+:root {
+  --fl-1: url("/textures/fl-1.jpg");
+  --fl-2: url("/textures/fl-2.jpg");
+
+  --fluff-border: 1.5px solid rgba(0, 0, 0, 0.9);
+  --fluff-shadow-lg:
+    0 24px 44px -10px rgba(0, 0, 0, 0.45),
+    0 10px 20px -5px rgba(0, 0, 0, 0.28);
+  --fluff-shadow-sm:
+    0 12px 24px -6px rgba(0, 0, 0, 0.3),
+    0 4px 10px -2px rgba(0, 0, 0, 0.18);
 }
 
-html {
-  scroll-behavior: smooth;
+/* =========================================================
+   ENTIRE HOMEPAGE BACKGROUND — fl-2
+   ========================================================= */
+html,
+body,
+body > div:first-child {
+  min-height: 100vh;
+  background-color: transparent !important;
+  background-image: var(--fl-2) !important;
+  background-size: 140px 140px !important;
+  background-repeat: repeat !important;
+  background-attachment: fixed !important;
 }
 
-::selection {
-  background-color: #f43f5e;
-  color: #ffffff;
+/* =========================================================
+   NAVIGATION BAR — fl-1
+   ========================================================= */
+header,
+nav {
+  background-color: transparent !important;
+  background-image: var(--fl-1) !important;
+  background-size: 120px 120px !important;
+  background-repeat: repeat !important;
+  border-bottom: var(--fluff-border) !important;
+  box-shadow: var(--fluff-shadow-sm) !important;
 }
 
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-fade-up {
-  animation: fade-up 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-@keyframes float-dp {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
-}
-
-.animate-float-dp {
-  animation: float-dp 4.5s ease-in-out infinite;
-}
-
-@keyframes halo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-halo-spin {
-  animation: halo-spin 8s linear infinite;
-}
-
-@keyframes shimmer-line {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(320%);
-  }
-}
-
-.animate-shimmer-line {
-  animation: shimmer-line 2.8s ease-in-out infinite;
+/* =========================================================
+   BOXES INSIDE THE HOMEPAGE — fl-1
+   ========================================================= */
+main section > div[class*="rounded"],
+main article[class*="rounded"],
+main form[class*="rounded"],
+main > div > div[class*="rounded"],
+main [class*="card"][class*="rounded"],
+main [class*="bg-white"][class*="rounded"],
+main [class*="bg-slate-"][class*="rounded"],
+main [class*="bg-zinc-"][class*="rounded"],
+main [class*="bg-neutral-"][class*="rounded"],
+main [class*="glass"],
+main [class*="backdrop-blur"] {
+  background-color: transparent !important;
+  background-image: var(--fl-1) !important;
+  background-size: 120px 120px !important;
+  background-repeat: repeat !important;
+  border: var(--fluff-border) !important;
+  box-shadow: var(--fluff-shadow-lg) !important;
 }
