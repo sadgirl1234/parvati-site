@@ -73,21 +73,21 @@ body > div:first-child > div[class*="min-h-screen"] {
 header nav,
 header > div > div:has(a[href*="contact"]),
 header > div:has(a[href*="contact"]),
-main [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main [class*="bg-white"]:not(img):not(svg),
-main [class*="bg-pink-"]:not(img):not(svg),
-main [class*="bg-rose-"]:not(img):not(svg),
-main [class*="bg-slate-"]:not(img):not(svg),
-main [class*="bg-zinc-"]:not(img):not(svg),
-main [class*="bg-neutral-"]:not(img):not(svg),
-main [class*="glass"],
-main [class*="backdrop-blur"],
+main [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
+main [class*="bg-white"]:not(img):not(svg):not(button):not([role="button"]),
+main [class*="bg-pink-"]:not(img):not(svg):not(button):not([role="button"]),
+main [class*="bg-rose-"]:not(img):not(svg):not(button):not([role="button"]),
+main [class*="bg-slate-"]:not(img):not(svg):not(button):not([role="button"]),
+main [class*="bg-zinc-"]:not(img):not(svg):not(button):not([role="button"]),
+main [class*="bg-neutral-"]:not(img):not(svg):not(button):not([role="button"]),
+main [class*="glass"]:not(button):not([role="button"]),
+main [class*="backdrop-blur"]:not(button):not([role="button"]),
 main article,
 main form,
 footer,
 footer > div,
 footer section,
-footer [class*="rounded"] {
+footer [class*="rounded"]:not(button):not([role="button"]) {
   background-color: transparent !important;
   background-image: var(--fl-1) !important;
   background-size: 80px 80px !important;
@@ -108,10 +108,10 @@ header > div:has(a[href*="contact"]) {
 /* =========================================================
    LEVEL 2 — SUB-BOXES, INPUTS & COMMENTS (fl-1 + 3D SHADOW)
    ========================================================= */
-main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main article [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main form [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
+main article [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
+main form [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
+main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
 main textarea,
 main select {
   background-size: 72px 72px !important;
@@ -121,8 +121,8 @@ main select {
 /* =========================================================
    LEVEL 3+ — SUB-BOXES INSIDE SUB-BOXES (NESTED 3D SHADOW)
    ========================================================= */
-main [class*="rounded"] [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main [class*="rounded"] [class*="rounded"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+main [class*="rounded"] [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
+main [class*="rounded"] [class*="rounded"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
 main [class*="rounded"] [class*="rounded"] textarea,
 main [class*="rounded"] [class*="rounded"] select {
   background-size: 64px 64px !important;
@@ -132,13 +132,14 @@ main [class*="rounded"] [class*="rounded"] select {
 /* =========================================================
    ALL BUTTONS ON ALL PAGES — FL-3.JPG TEXTURE + 3D SHADOW
    ========================================================= */
-button,
-[role="button"],
-input[type="button"],
-input[type="submit"],
-input[type="reset"],
-a[class*="btn"],
-a[class*="button"] {
+html body button,
+html body [role="button"],
+html body input[type="button"],
+html body input[type="submit"],
+html body input[type="reset"],
+html body a[class*="btn"],
+html body a[class*="button"],
+html body main a[class*="rounded"] {
   background-color: transparent !important;
   background-image: var(--fl-3) !important;
   background-size: 64px 64px !important;
