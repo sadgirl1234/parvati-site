@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — HOMEPAGE FLUFFY TEXTURES (fl-1 & fl-2)
-   - fl-2: Entire homepage background
-   - fl-1: Navigation bar & boxes inside the homepage
+   PARVATI-SITE — FULL BG FL-2 + ROUNDED NAV PILL FL-1
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
@@ -14,17 +12,19 @@
     0 24px 44px -10px rgba(0, 0, 0, 0.45),
     0 10px 20px -5px rgba(0, 0, 0, 0.28);
   --fluff-shadow-sm:
-    0 12px 24px -6px rgba(0, 0, 0, 0.3),
-    0 4px 10px -2px rgba(0, 0, 0, 0.18);
+    0 12px 24px -6px rgba(0, 0, 0, 0.32),
+    0 4px 10px -2px rgba(0, 0, 0, 0.2);
 }
 
 /* =========================================================
-   ENTIRE HOMEPAGE BACKGROUND — fl-2
+   ENTIRE PAGE BACKGROUND (INCLUDING CENTER AREA) — fl-2
    ========================================================= */
 html,
 body,
-body > div:first-child {
-  min-height: 100vh;
+body > div:first-child,
+main,
+main > section:first-child,
+main > div:first-child {
   background-color: transparent !important;
   background-image: var(--fl-2) !important;
   background-size: 140px 140px !important;
@@ -32,33 +32,49 @@ body > div:first-child {
   background-attachment: fixed !important;
 }
 
+/* Remove milky/white full-height center veil so fl-2 shows through */
+body > div:first-child > div[class*="min-h-screen"],
+main > div[class*="max-w-"][class*="bg-white"],
+main > div[class*="max-w-"][class*="bg-pink-"],
+main > div[class*="max-w-"][class*="bg-rose-"],
+main > div[class*="max-w-"][class*="backdrop-blur"] {
+  background-color: transparent !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
 /* =========================================================
-   NAVIGATION BAR — fl-1
+   TOP HEADER TRANSPARENT + ROUNDED NAV PILL (DP TO CONTACT)
    ========================================================= */
-header,
-nav {
+header {
+  background-color: transparent !important;
+  background-image: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+header nav,
+header > div > div:has(a[href*="contact"]),
+header > div:has(a[href*="contact"]) {
   background-color: transparent !important;
   background-image: var(--fl-1) !important;
   background-size: 120px 120px !important;
   background-repeat: repeat !important;
-  border-bottom: var(--fluff-border) !important;
+  border: var(--fluff-border) !important;
+  border-radius: 9999px !important;
   box-shadow: var(--fluff-shadow-sm) !important;
 }
 
 /* =========================================================
-   BOXES INSIDE THE HOMEPAGE — fl-1
+   CONTENT CARDS & BOXES INSIDE THE PAGE — fl-1
    ========================================================= */
 main section > div[class*="rounded"],
 main article[class*="rounded"],
 main form[class*="rounded"],
-main > div > div[class*="rounded"],
 main [class*="card"][class*="rounded"],
-main [class*="bg-white"][class*="rounded"],
-main [class*="bg-slate-"][class*="rounded"],
-main [class*="bg-zinc-"][class*="rounded"],
-main [class*="bg-neutral-"][class*="rounded"],
-main [class*="glass"],
-main [class*="backdrop-blur"] {
+main [class*="glass"] {
   background-color: transparent !important;
   background-image: var(--fl-1) !important;
   background-size: 120px 120px !important;
