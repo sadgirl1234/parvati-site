@@ -1,24 +1,36 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — FULL BG (fl-2) + ALL BOXES & ELEMENTS (fl-1)
+   PARVATI-SITE — DEEP MULTI-LAYER 3D BLACK SHADOWS ON ALL BOXES & SUB-BOXES
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
   --fl-2: url("/textures/fl-2.jpg");
 
-  --ultra-dark-shadow-lg:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.78),
-    0 34px 64px -10px rgba(0, 0, 0, 0.94),
-    0 18px 34px -6px rgba(0, 0, 0, 0.85),
-    0 8px 16px -2px rgba(0, 0, 0, 0.75);
+  /* Level 1: Main cards, nav pill & footer — tallest lift */
+  --shadow-3d-l1:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.28),
+    inset 0 -5px 10px rgba(0, 0, 0, 0.88),
+    0 38px 72px -10px rgba(0, 0, 0, 0.98),
+    0 22px 42px -6px rgba(0, 0, 0, 0.92),
+    0 10px 20px -2px rgba(0, 0, 0, 0.85),
+    0 3px 6px 0 rgba(0, 0, 0, 0.9);
 
-  --ultra-dark-shadow-sm:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.72),
-    0 20px 38px -8px rgba(0, 0, 0, 0.9),
-    0 8px 18px -4px rgba(0, 0, 0, 0.75);
+  /* Level 2: Direct sub-boxes, inputs, buttons & guestbook entries */
+  --shadow-3d-l2:
+    inset 0 1px 1px rgba(255, 255, 255, 0.24),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.84),
+    0 24px 46px -8px rgba(0, 0, 0, 0.96),
+    0 12px 24px -4px rgba(0, 0, 0, 0.86),
+    0 4px 10px -1px rgba(0, 0, 0, 0.78);
+
+  /* Level 3+: Sub-boxes inside sub-boxes (nested pills, badges, inner rows) */
+  --shadow-3d-l3:
+    inset 0 1px 0.5px rgba(255, 255, 255, 0.2),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.8),
+    0 14px 28px -6px rgba(0, 0, 0, 0.95),
+    0 6px 14px -2px rgba(0, 0, 0, 0.85),
+    0 2px 5px 0 rgba(0, 0, 0, 0.78);
 
   --text-black-shadow:
     0 2px 6px rgba(0, 0, 0, 0.95),
@@ -55,7 +67,7 @@ body > div:first-child > div[class*="min-h-screen"] {
 }
 
 /* =========================================================
-   EVERY BOX, CARD, PILL, COMMENT, INPUT, BUTTON & FOOTER — fl-1
+   LEVEL 1 — MAIN BOXES, NAV PILL & FOOTER (fl-1 + DEEP 3D SHADOW)
    ========================================================= */
 header nav,
 header > div > div:has(a[href*="contact"]),
@@ -71,11 +83,6 @@ main [class*="glass"],
 main [class*="backdrop-blur"],
 main article,
 main form,
-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-main textarea,
-main select,
-main button,
-main a[class*="rounded"],
 footer,
 footer > div,
 footer section,
@@ -88,25 +95,41 @@ footer [class*="rounded"] {
   -webkit-backdrop-filter: none !important;
   border: none !important;
   outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
+  box-shadow: var(--shadow-3d-l1) !important;
 }
 
-/* Rounded pill shape on navigation bar */
 header nav,
 header > div > div:has(a[href*="contact"]),
 header > div:has(a[href*="contact"]) {
   border-radius: 9999px !important;
 }
 
-/* Tighter 3D shadow for inner sub-boxes, comments, inputs & buttons */
+/* =========================================================
+   LEVEL 2 — SUB-BOXES, INPUTS, BUTTONS & COMMENTS (fl-1 + 3D SHADOW)
+   ========================================================= */
 main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main article [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main form [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main textarea,
 main select,
 main button,
 main a[class*="rounded"] {
   background-size: 72px 72px !important;
-  box-shadow: var(--ultra-dark-shadow-sm) !important;
+  box-shadow: var(--shadow-3d-l2) !important;
+}
+
+/* =========================================================
+   LEVEL 3+ — SUB-BOXES INSIDE SUB-BOXES (NESTED 3D SHADOW)
+   ========================================================= */
+main [class*="rounded"] [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main [class*="rounded"] [class*="rounded"] button,
+main [class*="rounded"] [class*="rounded"] a[class*="rounded"],
+main [class*="rounded"] [class*="rounded"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+main [class*="rounded"] [class*="rounded"] textarea,
+main [class*="rounded"] [class*="rounded"] select {
+  background-size: 64px 64px !important;
+  box-shadow: var(--shadow-3d-l3) !important;
 }
 
 /* =========================================================
