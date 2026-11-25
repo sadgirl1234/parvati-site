@@ -1,29 +1,56 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — REAL AI CHAT BG TEXTURE + BOTTOM FL-2 TEXTURE
+   PARVATI-SITE — ALL PAGES: FL-1 WHITE AREAS + EXTRA-DARK 3D SHADOWS
+   + RE-ANIMATED ADMIN NAME + BOLD WHITE TEXT + TEXTURED AI INPUT
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
   --fl-2: url("/textures/fl-2.jpg");
   --fl-3: url("/textures/fl-3.jpg");
 
-  --ultra-dark-shadow-lg:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.78),
-    0 34px 64px -10px rgba(0, 0, 0, 0.94),
-    0 18px 34px -6px rgba(0, 0, 0, 0.85),
-    0 8px 16px -2px rgba(0, 0, 0, 0.75);
+  --box-3d-extra-dark-lg:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.28),
+    inset 0 -5px 10px rgba(0, 0, 0, 0.85),
+    0 38px 72px -10px rgba(0, 0, 0, 0.96),
+    0 20px 38px -6px rgba(0, 0, 0, 0.9),
+    0 8px 18px -2px rgba(0, 0, 0, 0.8);
 
-  --ultra-dark-shadow-sm:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.72),
-    0 20px 38px -8px rgba(0, 0, 0, 0.9),
-    0 8px 18px -4px rgba(0, 0, 0, 0.75);
+  --box-3d-extra-dark-sm:
+    inset 0 1px 1px rgba(255, 255, 255, 0.24),
+    inset 0 -3px 7px rgba(0, 0, 0, 0.78),
+    0 22px 42px -8px rgba(0, 0, 0, 0.94),
+    0 10px 20px -4px rgba(0, 0, 0, 0.82);
 
-  --crisp-text-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.95),
-    0 0 2px rgba(0, 0, 0, 0.98);
+  --media-ring-3d:
+    0 0 0 3px rgba(255, 255, 255, 0.45),
+    0 0 0 5px rgba(0, 0, 0, 0.92),
+    0 24px 44px -8px rgba(0, 0, 0, 0.95),
+    0 10px 20px -4px rgba(0, 0, 0, 0.85);
+
+  --text-depth-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.78),
+    0 0 2px rgba(0, 0, 0, 0.85);
+}
+
+@keyframes parvatiNameFloat {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) scale(1.015);
+  }
+}
+
+@keyframes parvatiCardLift {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
 }
 
 /* =========================================================
@@ -38,7 +65,6 @@ body > div:first-child {
   background-size: 130px 130px !important;
   background-repeat: repeat !important;
   background-attachment: fixed !important;
-  border: none !important;
 }
 
 main,
@@ -49,13 +75,13 @@ body > div:first-child > div[class*="min-h-screen"] {
   background-image: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border: none !important;
   box-shadow: none !important;
 }
 
 /* =========================================================
-   HIGH-CONTRAST READABLE TEXT OVER TEXTURES
+   ALL TEXT ACROSS ALL PAGES — BOLD WHITE WITH LITTLE DEPTH SHADOW
    ========================================================= */
+html,
 body,
 main,
 header,
@@ -78,19 +104,8 @@ input,
 textarea,
 select {
   color: #ffffff !important;
-  text-shadow: var(--crisp-text-shadow) !important;
-}
-
-p,
-li,
-span,
-label,
-a,
-button,
-input,
-textarea,
-select {
   font-weight: 700 !important;
+  text-shadow: var(--text-depth-shadow) !important;
 }
 
 h1,
@@ -99,22 +114,32 @@ h3,
 h4,
 h5,
 h6 {
-  font-weight: 900 !important;
+  font-weight: 800 !important;
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: rgba(255, 255, 255, 0.88) !important;
-  text-shadow: var(--crisp-text-shadow) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-weight: 600 !important;
+  text-shadow: var(--text-depth-shadow) !important;
 }
 
 /* =========================================================
-   ROUNDED NAVIGATION PILL — fl-1 + NO BORDER + ULTRA DARK SHADOW
+   RE-ANIMATE ADMIN NAME ON HOME & CONTACT PAGES
+   ========================================================= */
+main h1,
+main h2:first-of-type {
+  display: inline-block;
+  animation: parvatiNameFloat 3.4s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* =========================================================
+   ROUNDED NAVIGATION PILL — fl-1 + EXTRA-DARK 3D SHADOW
    ========================================================= */
 header {
   background-color: transparent !important;
   background-image: none !important;
-  border: none !important;
   box-shadow: none !important;
 }
 
@@ -125,44 +150,33 @@ header > div:has(a[href*="contact"]) {
   background-image: var(--fl-1) !important;
   background-size: 80px 80px !important;
   background-repeat: repeat !important;
-  border: none !important;
-  outline: none !important;
   border-radius: 9999px !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
+  box-shadow: var(--box-3d-extra-dark-lg) !important;
 }
 
 /* =========================================================
-   HOME & MAIN BOXES — fl-3 + NO BORDER + ULTRA DARK SHADOW
+   WHITE AREAS, CARDS, PILLS & BOXES — APPLY fl-1 + EXTRA-DARK 3D SHADOW
    ========================================================= */
-main section > div[class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main section > div[class*="rounded"]:not(:has(img[class*="rounded-full"])):not(:has(video)),
 main article[class*="rounded"],
 main form[class*="rounded"],
-main > div > div[class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="card"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-white"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-pink-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-rose-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-slate-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="glass"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="backdrop-blur"]:not(:has(textarea)):not(:has([class*="overflow-y"])) {
+main [class*="card"][class*="rounded"],
+main [class*="bg-white"],
+main [class*="bg-pink-"],
+main [class*="bg-rose-"],
+main [class*="bg-slate-"],
+main [class*="glass"],
+main [class*="backdrop-blur"] {
   background-color: transparent !important;
-  background-image: var(--fl-3) !important;
-  background-size: 95px 95px !important;
+  background-image: var(--fl-1) !important;
+  background-size: 85px 85px !important;
   background-repeat: repeat !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
+  box-shadow: var(--box-3d-extra-dark-lg) !important;
 }
 
-/* =========================================================
-   SUB-BOXES, BUTTONS & STANDARD INPUTS — fl-1 + ULTRA DARK SHADOW
-   ========================================================= */
-main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-main textarea,
-main select,
+main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not(video):not([role="progressbar"]),
 main button[class*="rounded"],
 main a[class*="rounded"] {
   background-color: transparent !important;
@@ -171,50 +185,51 @@ main a[class*="rounded"] {
   background-repeat: repeat !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-sm) !important;
+  box-shadow: var(--box-3d-extra-dark-sm) !important;
 }
 
 /* =========================================================
-   AI CHAT MAIN AREA (TOP ARROW) — REAL TILED TEXTURE + ULTRA DARK SHADOW
+   AI CHAT TYPING TEXTBOX & COMPOSER AREA — USE BACKGROUND TEXTURES
    ========================================================= */
-main div[class*="rounded"]:has([class*="overflow-y"]),
-main div[class*="overflow-y-auto"][class*="rounded"],
-main div[class*="overflow-auto"][class*="rounded"] {
-  background-color: transparent !important;
-  background-image: var(--fl-3) !important;
-  background-size: 90px 90px !important;
-  background-repeat: repeat !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
-}
-
-/* =========================================================
-   BOTTOM INPUT / MIC AREA (BOTTOM ARROW) — fl-2 TEXTURE + ULTRA DARK SHADOW
-   ========================================================= */
+main textarea,
+main input[type="text"],
+main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main div[class*="rounded"]:has(textarea),
 main div[class*="rounded"]:has(input[placeholder*="Sweetie" i]),
 main div[class*="rounded"]:has(input[placeholder*="Ask" i]),
-main div[class*="rounded"]:has(button:has(svg)):has(input),
+main div[class*="rounded"]:has(button:has(svg)):has(input) {
+  background-color: transparent !important;
+  background-image: var(--fl-1) !important;
+  background-size: 76px 76px !important;
+  background-repeat: repeat !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: var(--box-3d-extra-dark-sm) !important;
+}
+
 main > div > div:last-child:has(button):has(input),
 main > div > div:last-child:has(button):has(textarea) {
   background-color: transparent !important;
   background-image: var(--fl-2) !important;
   background-size: 115px 115px !important;
   background-repeat: repeat !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
+  box-shadow: var(--box-3d-extra-dark-lg) !important;
 }
 
 /* =========================================================
-   FOOTER AREA — fl-1 + NO BORDER + ULTRA DARK SHADOW
+   DP & VIDEO BORDERS — RE-STYLED 3D BORDERS & DEEP SHADOWS
+   ========================================================= */
+img[class*="rounded-full"],
+div[class*="rounded-full"]:has(> img),
+video,
+div[class*="rounded"]:has(> video) {
+  border: 2px solid rgba(255, 255, 255, 0.72) !important;
+  outline: 2px solid rgba(0, 0, 0, 0.92) !important;
+  box-shadow: var(--media-ring-3d) !important;
+}
+
+/* =========================================================
+   FOOTER AREA — fl-1 + EXTRA-DARK 3D SHADOW
    ========================================================= */
 footer,
 footer > div,
@@ -224,7 +239,12 @@ footer [class*="rounded"] {
   background-image: var(--fl-1) !important;
   background-size: 80px 80px !important;
   background-repeat: repeat !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
+  box-shadow: var(--box-3d-extra-dark-lg) !important;
+}
+
+/* Pause floating while typing so text entry stays steady */
+input:focus,
+textarea:focus,
+form:focus-within {
+  animation-play-state: paused !important;
 }
