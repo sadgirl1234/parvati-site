@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — DEEP MULTI-LAYER 3D BLACK SHADOWS ON ALL BOXES & SUB-BOXES
+   PARVATI-SITE — ALL BUTTONS ON FL-3.JPG + DEEP 3D SHADOWS
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
   --fl-2: url("/textures/fl-2.jpg");
+  --fl-3: url("/textures/fl-3.jpg");
 
   /* Level 1: Main cards, nav pill & footer — tallest lift */
   --shadow-3d-l1:
@@ -16,7 +17,7 @@
     0 10px 20px -2px rgba(0, 0, 0, 0.85),
     0 3px 6px 0 rgba(0, 0, 0, 0.9);
 
-  /* Level 2: Direct sub-boxes, inputs, buttons & guestbook entries */
+  /* Level 2: Direct sub-boxes, inputs & guestbook entries */
   --shadow-3d-l2:
     inset 0 1px 1px rgba(255, 255, 255, 0.24),
     inset 0 -4px 8px rgba(0, 0, 0, 0.84),
@@ -24,7 +25,7 @@
     0 12px 24px -4px rgba(0, 0, 0, 0.86),
     0 4px 10px -1px rgba(0, 0, 0, 0.78);
 
-  /* Level 3+: Sub-boxes inside sub-boxes (nested pills, badges, inner rows) */
+  /* Level 3+: Sub-boxes inside sub-boxes & buttons */
   --shadow-3d-l3:
     inset 0 1px 0.5px rgba(255, 255, 255, 0.2),
     inset 0 -3px 6px rgba(0, 0, 0, 0.8),
@@ -105,16 +106,14 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   LEVEL 2 — SUB-BOXES, INPUTS, BUTTONS & COMMENTS (fl-1 + 3D SHADOW)
+   LEVEL 2 — SUB-BOXES, INPUTS & COMMENTS (fl-1 + 3D SHADOW)
    ========================================================= */
 main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
 main article [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
 main form [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main textarea,
-main select,
-main button,
-main a[class*="rounded"] {
+main select {
   background-size: 72px 72px !important;
   box-shadow: var(--shadow-3d-l2) !important;
 }
@@ -123,12 +122,31 @@ main a[class*="rounded"] {
    LEVEL 3+ — SUB-BOXES INSIDE SUB-BOXES (NESTED 3D SHADOW)
    ========================================================= */
 main [class*="rounded"] [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main [class*="rounded"] [class*="rounded"] button,
-main [class*="rounded"] [class*="rounded"] a[class*="rounded"],
 main [class*="rounded"] [class*="rounded"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main [class*="rounded"] [class*="rounded"] textarea,
 main [class*="rounded"] [class*="rounded"] select {
   background-size: 64px 64px !important;
+  box-shadow: var(--shadow-3d-l3) !important;
+}
+
+/* =========================================================
+   ALL BUTTONS ON ALL PAGES — FL-3.JPG TEXTURE + 3D SHADOW
+   ========================================================= */
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+a[class*="btn"],
+a[class*="button"] {
+  background-color: transparent !important;
+  background-image: var(--fl-3) !important;
+  background-size: 64px 64px !important;
+  background-repeat: repeat !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  outline: none !important;
   box-shadow: var(--shadow-3d-l3) !important;
 }
 
