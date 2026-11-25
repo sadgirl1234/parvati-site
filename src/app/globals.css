@@ -1,11 +1,12 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — RESTORE FL-2 BG + HIGH-CONTRAST TEXT + NO BORDERS + ULTRA DARK SHADOWS
+   PARVATI-SITE — FL-3 ON MAIN WHITE BOXES ONLY (NOT SUB-BOXES)
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
   --fl-2: url("/textures/fl-2.jpg");
+  --fl-3: url("/textures/fl-3.jpg");
 
   --ultra-dark-shadow-lg:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
@@ -26,7 +27,7 @@
 }
 
 /* =========================================================
-   RESTORE FULL WEBSITE BACKGROUND — fl-2
+   FULL WEBSITE BACKGROUND — fl-2
    ========================================================= */
 html,
 body,
@@ -40,7 +41,6 @@ body > div:first-child {
   border: none !important;
 }
 
-/* Keep wrapper containers transparent so fl-2 shows across the whole page */
 main,
 main > section:first-child,
 main > div:first-child,
@@ -132,12 +132,11 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   ALL BOXES, CARDS, INPUTS & BUTTONS — fl-1 + NO BORDER + ULTRA DARK SHADOW
+   MAIN WHITE CONTAINER BOXES ONLY — fl-3 + NO BORDER + ULTRA DARK SHADOW
    ========================================================= */
-main section > div[class*="rounded"],
+main section > div[class*="rounded"]:not(:has([class*="rounded"] [class*="rounded"])),
 main article[class*="rounded"],
 main form[class*="rounded"],
-main > div > div[class*="rounded"],
 main [class*="card"][class*="rounded"],
 main [class*="bg-white"][class*="rounded"],
 main [class*="bg-pink-"][class*="rounded"],
@@ -146,8 +145,8 @@ main [class*="bg-slate-"][class*="rounded"],
 main [class*="glass"],
 main [class*="backdrop-blur"] {
   background-color: transparent !important;
-  background-image: var(--fl-1) !important;
-  background-size: 80px 80px !important;
+  background-image: var(--fl-3) !important;
+  background-size: 95px 95px !important;
   background-repeat: repeat !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -156,6 +155,22 @@ main [class*="backdrop-blur"] {
   box-shadow: var(--ultra-dark-shadow-lg) !important;
 }
 
+/* Outer wrapper boxes (such as Guestbook container) using fl-3 */
+main > div > div[class*="rounded"]:has(input),
+main > div > div[class*="rounded"]:has(textarea),
+main > div > div[class*="rounded"]:has(button) {
+  background-color: transparent !important;
+  background-image: var(--fl-3) !important;
+  background-size: 95px 95px !important;
+  background-repeat: repeat !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: var(--ultra-dark-shadow-lg) !important;
+}
+
+/* =========================================================
+   SUB-BOXES, INPUTS, BUTTONS & NOTES — fl-1 (NOT fl-3)
+   ========================================================= */
 main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main textarea,
