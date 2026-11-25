@@ -1,11 +1,10 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — FULL BG FL-2 + ROUNDED NAV PILL FL-1
+   PARVATI-SITE — ONLY fl-1 IN VERY SMALL TILE SIZE
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
-  --fl-2: url("/textures/fl-2.jpg");
 
   --fluff-border: 1.5px solid rgba(0, 0, 0, 0.9);
   --fluff-shadow-lg:
@@ -17,7 +16,7 @@
 }
 
 /* =========================================================
-   ENTIRE PAGE BACKGROUND (INCLUDING CENTER AREA) — fl-2
+   ENTIRE PAGE BACKGROUND (INCLUDING CENTER AREA) — fl-1 TINY TILE
    ========================================================= */
 html,
 body,
@@ -26,13 +25,13 @@ main,
 main > section:first-child,
 main > div:first-child {
   background-color: transparent !important;
-  background-image: var(--fl-2) !important;
-  background-size: 140px 140px !important;
+  background-image: var(--fl-1) !important;
+  background-size: 64px 64px !important;
   background-repeat: repeat !important;
   background-attachment: fixed !important;
 }
 
-/* Remove milky/white full-height center veil so fl-2 shows through */
+/* Keep center column clear so fl-1 shows through cleanly */
 body > div:first-child > div[class*="min-h-screen"],
 main > div[class*="max-w-"][class*="bg-white"],
 main > div[class*="max-w-"][class*="bg-pink-"],
@@ -60,7 +59,7 @@ header > div > div:has(a[href*="contact"]),
 header > div:has(a[href*="contact"]) {
   background-color: transparent !important;
   background-image: var(--fl-1) !important;
-  background-size: 120px 120px !important;
+  background-size: 56px 56px !important;
   background-repeat: repeat !important;
   border: var(--fluff-border) !important;
   border-radius: 9999px !important;
@@ -68,7 +67,7 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   CONTENT CARDS & BOXES INSIDE THE PAGE — fl-1
+   CONTENT CARDS & BOXES INSIDE THE PAGE — fl-1 TINY TILE
    ========================================================= */
 main section > div[class*="rounded"],
 main article[class*="rounded"],
@@ -77,7 +76,7 @@ main [class*="card"][class*="rounded"],
 main [class*="glass"] {
   background-color: transparent !important;
   background-image: var(--fl-1) !important;
-  background-size: 120px 120px !important;
+  background-size: 56px 56px !important;
   background-repeat: repeat !important;
   border: var(--fluff-border) !important;
   box-shadow: var(--fluff-shadow-lg) !important;
