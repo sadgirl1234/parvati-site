@@ -1,34 +1,28 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — ALL BUTTONS ON FL-3.JPG + DEEP 3D SHADOWS
+   PARVATI-SITE — OUTSIDE 3D BLACK SHADOWS ONLY (NO INSET SHADOWS)
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
   --fl-2: url("/textures/fl-2.jpg");
   --fl-3: url("/textures/fl-3.jpg");
 
-  /* Level 1: Main cards, nav pill & footer — tallest lift */
+  /* Level 1: Main cards, nav pill & footer — outside black shadow only */
   --shadow-3d-l1:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.28),
-    inset 0 -5px 10px rgba(0, 0, 0, 0.88),
     0 38px 72px -10px rgba(0, 0, 0, 0.98),
     0 22px 42px -6px rgba(0, 0, 0, 0.92),
     0 10px 20px -2px rgba(0, 0, 0, 0.85),
     0 3px 6px 0 rgba(0, 0, 0, 0.9);
 
-  /* Level 2: Direct sub-boxes, inputs & guestbook entries */
+  /* Level 2: Direct sub-boxes, inputs & guestbook entries — outside black shadow only */
   --shadow-3d-l2:
-    inset 0 1px 1px rgba(255, 255, 255, 0.24),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.84),
     0 24px 46px -8px rgba(0, 0, 0, 0.96),
     0 12px 24px -4px rgba(0, 0, 0, 0.86),
     0 4px 10px -1px rgba(0, 0, 0, 0.78);
 
-  /* Level 3+: Sub-boxes inside sub-boxes & buttons */
+  /* Level 3+: Sub-boxes inside sub-boxes & buttons — outside black shadow only */
   --shadow-3d-l3:
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.2),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.8),
     0 14px 28px -6px rgba(0, 0, 0, 0.95),
     0 6px 14px -2px rgba(0, 0, 0, 0.85),
     0 2px 5px 0 rgba(0, 0, 0, 0.78);
@@ -68,7 +62,7 @@ body > div:first-child > div[class*="min-h-screen"] {
 }
 
 /* =========================================================
-   LEVEL 1 — MAIN BOXES, NAV PILL & FOOTER (fl-1 + DEEP 3D SHADOW)
+   LEVEL 1 — MAIN BOXES, NAV PILL & FOOTER (fl-1 + OUTSIDE 3D SHADOW)
    ========================================================= */
 header nav,
 header > div > div:has(a[href*="contact"]),
@@ -106,7 +100,7 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   LEVEL 2 — SUB-BOXES, INPUTS & COMMENTS (fl-1 + 3D SHADOW)
+   LEVEL 2 — SUB-BOXES, INPUTS & COMMENTS (fl-1 + OUTSIDE 3D SHADOW)
    ========================================================= */
 main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
 main article [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
@@ -119,7 +113,7 @@ main select {
 }
 
 /* =========================================================
-   LEVEL 3+ — SUB-BOXES INSIDE SUB-BOXES (NESTED 3D SHADOW)
+   LEVEL 3+ — SUB-BOXES INSIDE SUB-BOXES (OUTSIDE 3D SHADOW)
    ========================================================= */
 main [class*="rounded"] [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
 main [class*="rounded"] [class*="rounded"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
@@ -130,7 +124,7 @@ main [class*="rounded"] [class*="rounded"] select {
 }
 
 /* =========================================================
-   ALL BUTTONS ON ALL PAGES — FL-3.JPG TEXTURE + 3D SHADOW
+   ALL BUTTONS ON ALL PAGES — FL-3.JPG TEXTURE + OUTSIDE 3D SHADOW
    ========================================================= */
 html body button,
 html body [role="button"],
