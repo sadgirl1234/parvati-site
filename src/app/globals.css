@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — FINAL GLOBALS.CSS
+   PARVATI-SITE — CLEAN GLOBALS.CSS
    - Full BG: fl-2
-   - Rounded Nav Pill, Sub-boxes, Inputs, Buttons & Footer: fl-1
-   - Main White Boxes (Name Pill, Love Notes Card, Guestbook): fl-3
+   - Rounded Nav Pill, Sub-boxes, Guestbook Comments, Inputs, Buttons & Footer: fl-1
+   - Main White Boxes (Name Pill & Love Notes Card): fl-3
    - AI Chat Box: Real tiled texture | Bottom Mic/Input Bar: fl-2
    - No borders, ultra-dark 3D shadows, black text shadow (excl. animated)
    ========================================================= */
@@ -82,27 +82,15 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   MAIN WHITE BOXES (NAME PILL, LOVE NOTES CARD, GUESTBOOK) — fl-3
+   MAIN WHITE BOXES (NAME PILL & LOVE NOTES CARD) — fl-3
    ========================================================= */
 main div[class*="rounded-full"]:has(h1),
 main div[class*="rounded-full"]:has(h2),
 main div[class*="rounded-full"]:has(h3),
-main div[class*="rounded"]:has(h1):not(a):not(button),
-main section > div[class*="rounded"]:has(p):not(:has(textarea)):not(:has([class*="overflow-y"])),
-main > div > div[class*="rounded"]:has(p):not(:has(textarea)):not(:has([class*="overflow-y"])),
 main section > div[class*="rounded-2xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
 main section > div[class*="rounded-3xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
 main > div > div[class*="rounded-2xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main > div > div[class*="rounded-3xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main article[class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main form[class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="card"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-white"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-pink-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-rose-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="bg-slate-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="glass"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main [class*="backdrop-blur"]:not(:has(textarea)):not(:has([class*="overflow-y"])) {
+main > div > div[class*="rounded-3xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])) {
   background-color: transparent !important;
   background-image: var(--fl-3) !important;
   background-size: 96px 96px !important;
@@ -115,9 +103,11 @@ main [class*="backdrop-blur"]:not(:has(textarea)):not(:has([class*="overflow-y"]
 }
 
 /* =========================================================
-   SUB-BOXES, BUTTONS & STANDARD INPUTS — fl-1 + ULTRA DARK SHADOW
+   SUB-BOXES, GUESTBOOK COMMENTS, BUTTONS & INPUTS — fl-1
    ========================================================= */
-main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(:has(p)),
+main section > div[class*="rounded"] div[class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main > div > div[class*="rounded"] div[class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main article[class*="rounded"],
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main textarea,
 main select,
