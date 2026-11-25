@@ -1,17 +1,11 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — CLEAN GLOBALS.CSS
-   - Full BG: fl-2
-   - Rounded Nav Pill, Sub-boxes, Guestbook Comments, Inputs, Buttons & Footer: fl-1
-   - Main White Boxes (Name Pill & Love Notes Card): fl-3
-   - AI Chat Box: Real tiled texture | Bottom Mic/Input Bar: fl-2
-   - No borders, ultra-dark 3D shadows, black text shadow (excl. animated)
+   PARVATI-SITE — FULL BG (fl-2) + ALL BOXES & ELEMENTS (fl-1)
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
   --fl-2: url("/textures/fl-2.jpg");
-  --fl-3: url("/textures/fl-3.jpg");
 
   --ultra-dark-shadow-lg:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
@@ -32,7 +26,7 @@
 }
 
 /* =========================================================
-   FULL WEBSITE BACKGROUND — fl-2
+   FULL-SCREEN BACKGROUND ONLY — fl-2
    ========================================================= */
 html,
 body,
@@ -46,6 +40,8 @@ body > div:first-child {
   border: none !important;
 }
 
+/* Transparent structural wrappers so full-screen fl-2 shows around boxes */
+header,
 main,
 main > section:first-child,
 main > div:first-child,
@@ -59,111 +55,27 @@ body > div:first-child > div[class*="min-h-screen"] {
 }
 
 /* =========================================================
-   ROUNDED NAVIGATION PILL — fl-1 + NO BORDER + ULTRA DARK SHADOW
+   EVERY BOX, CARD, PILL, COMMENT, INPUT, BUTTON & FOOTER — fl-1
    ========================================================= */
-header {
-  background-color: transparent !important;
-  background-image: none !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
 header nav,
 header > div > div:has(a[href*="contact"]),
-header > div:has(a[href*="contact"]) {
-  background-color: transparent !important;
-  background-image: var(--fl-1) !important;
-  background-size: 80px 80px !important;
-  background-repeat: repeat !important;
-  border: none !important;
-  outline: none !important;
-  border-radius: 9999px !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
-}
-
-/* =========================================================
-   MAIN WHITE BOXES (NAME PILL & LOVE NOTES CARD) — fl-3
-   ========================================================= */
-main div[class*="rounded-full"]:has(h1),
-main div[class*="rounded-full"]:has(h2),
-main div[class*="rounded-full"]:has(h3),
-main section > div[class*="rounded-2xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main section > div[class*="rounded-3xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main > div > div[class*="rounded-2xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
-main > div > div[class*="rounded-3xl"]:not(:has(textarea)):not(:has([class*="overflow-y"])) {
-  background-color: transparent !important;
-  background-image: var(--fl-3) !important;
-  background-size: 96px 96px !important;
-  background-repeat: repeat !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
-}
-
-/* =========================================================
-   SUB-BOXES, GUESTBOOK COMMENTS, BUTTONS & INPUTS — fl-1
-   ========================================================= */
-main section > div[class*="rounded"] div[class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main > div > div[class*="rounded"] div[class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
-main article[class*="rounded"],
+header > div:has(a[href*="contact"]),
+main [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main [class*="bg-white"]:not(img):not(svg),
+main [class*="bg-pink-"]:not(img):not(svg),
+main [class*="bg-rose-"]:not(img):not(svg),
+main [class*="bg-slate-"]:not(img):not(svg),
+main [class*="bg-zinc-"]:not(img):not(svg),
+main [class*="bg-neutral-"]:not(img):not(svg),
+main [class*="glass"],
+main [class*="backdrop-blur"],
+main article,
+main form,
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 main textarea,
 main select,
-main button[class*="rounded"],
-main a[class*="rounded"] {
-  background-color: transparent !important;
-  background-image: var(--fl-1) !important;
-  background-size: 72px 72px !important;
-  background-repeat: repeat !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-sm) !important;
-}
-
-/* =========================================================
-   AI CHAT MAIN AREA — REAL TILED TEXTURE + ULTRA DARK SHADOW
-   ========================================================= */
-main div[class*="rounded"]:has([class*="overflow-y"]),
-main div[class*="overflow-y-auto"][class*="rounded"],
-main div[class*="overflow-auto"][class*="rounded"] {
-  background-color: transparent !important;
-  background-image: var(--fl-3) !important;
-  background-size: 90px 90px !important;
-  background-repeat: repeat !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
-}
-
-/* =========================================================
-   BOTTOM INPUT / MIC AREA — fl-2 TEXTURE + ULTRA DARK SHADOW
-   ========================================================= */
-main div[class*="rounded"]:has(textarea),
-main div[class*="rounded"]:has(input[placeholder*="Sweetie" i]),
-main div[class*="rounded"]:has(input[placeholder*="Ask" i]),
-main div[class*="rounded"]:has(button:has(svg)):has(input),
-main > div > div:last-child:has(button):has(input),
-main > div > div:last-child:has(button):has(textarea) {
-  background-color: transparent !important;
-  background-image: var(--fl-2) !important;
-  background-size: 115px 115px !important;
-  background-repeat: repeat !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
-}
-
-/* =========================================================
-   FOOTER AREA — fl-1 + NO BORDER + ULTRA DARK SHADOW
-   ========================================================= */
+main button,
+main a[class*="rounded"],
 footer,
 footer > div,
 footer section,
@@ -172,13 +84,33 @@ footer [class*="rounded"] {
   background-image: var(--fl-1) !important;
   background-size: 80px 80px !important;
   background-repeat: repeat !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   border: none !important;
   outline: none !important;
   box-shadow: var(--ultra-dark-shadow-lg) !important;
 }
 
+/* Rounded pill shape on navigation bar */
+header nav,
+header > div > div:has(a[href*="contact"]),
+header > div:has(a[href*="contact"]) {
+  border-radius: 9999px !important;
+}
+
+/* Tighter 3D shadow for inner sub-boxes, comments, inputs & buttons */
+main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
+main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+main textarea,
+main select,
+main button,
+main a[class*="rounded"] {
+  background-size: 72px 72px !important;
+  box-shadow: var(--ultra-dark-shadow-sm) !important;
+}
+
 /* =========================================================
-   HIGH-CONTRAST TEXT & BLACK SHADOW (EXCLUDING ANIMATED ELEMENTS)
+   BOLD WHITE TEXT + BLACK SHADOW (EXCLUDING ANIMATED ELEMENTS)
    ========================================================= */
 body,
 main,
