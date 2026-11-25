@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — FL-3 ON MAIN WHITE BOXES ONLY (NOT SUB-BOXES)
+   PARVATI-SITE — HOME WHITE BOXES (fl-3) + AI ORIGINAL BG + HOLD MIC BAR (fl-2)
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
@@ -104,7 +104,7 @@ h6 {
 
 input::placeholder,
 textarea::placeholder {
-  color: rgba(255, 255, 255, 0.85) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
   text-shadow: var(--crisp-text-shadow) !important;
 }
 
@@ -132,18 +132,19 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   MAIN WHITE CONTAINER BOXES ONLY — fl-3 + NO BORDER + ULTRA DARK SHADOW
+   HOME & MAIN WHITE BOXES — fl-3 + NO BORDER + ULTRA DARK SHADOW
    ========================================================= */
-main section > div[class*="rounded"]:not(:has([class*="rounded"] [class*="rounded"])),
+main section > div[class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
 main article[class*="rounded"],
 main form[class*="rounded"],
-main [class*="card"][class*="rounded"],
-main [class*="bg-white"][class*="rounded"],
-main [class*="bg-pink-"][class*="rounded"],
-main [class*="bg-rose-"][class*="rounded"],
-main [class*="bg-slate-"][class*="rounded"],
-main [class*="glass"],
-main [class*="backdrop-blur"] {
+main > div > div[class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main [class*="card"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main [class*="bg-white"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main [class*="bg-pink-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main [class*="bg-rose-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main [class*="bg-slate-"][class*="rounded"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main [class*="glass"]:not(:has(textarea)):not(:has([class*="overflow-y"])),
+main [class*="backdrop-blur"]:not(:has(textarea)):not(:has([class*="overflow-y"])) {
   background-color: transparent !important;
   background-image: var(--fl-3) !important;
   background-size: 95px 95px !important;
@@ -155,21 +156,8 @@ main [class*="backdrop-blur"] {
   box-shadow: var(--ultra-dark-shadow-lg) !important;
 }
 
-/* Outer wrapper boxes (such as Guestbook container) using fl-3 */
-main > div > div[class*="rounded"]:has(input),
-main > div > div[class*="rounded"]:has(textarea),
-main > div > div[class*="rounded"]:has(button) {
-  background-color: transparent !important;
-  background-image: var(--fl-3) !important;
-  background-size: 95px 95px !important;
-  background-repeat: repeat !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: var(--ultra-dark-shadow-lg) !important;
-}
-
 /* =========================================================
-   SUB-BOXES, INPUTS, BUTTONS & NOTES — fl-1 (NOT fl-3)
+   SUB-BOXES, BUTTONS & STANDARD INPUTS — fl-1 + ULTRA DARK SHADOW
    ========================================================= */
 main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]),
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
@@ -186,6 +174,45 @@ main a[class*="rounded"] {
   border: none !important;
   outline: none !important;
   box-shadow: var(--ultra-dark-shadow-sm) !important;
+}
+
+/* =========================================================
+   AI / SWEETIE PAGE — KEEP CHAT BOX ORIGINAL WHITE + HOLD MIC BAR fl-2
+   ========================================================= */
+main div[class*="rounded"]:has([class*="overflow-y"]),
+main div[class*="overflow-y-auto"][class*="rounded"],
+main div[class*="overflow-auto"][class*="rounded"] {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: var(--ultra-dark-shadow-lg) !important;
+}
+
+main div[class*="rounded"]:has([class*="overflow-y"]) p,
+main div[class*="rounded"]:has([class*="overflow-y"]) span,
+main div[class*="rounded"]:has([class*="overflow-y"]) div:not([class*="rounded"]),
+main div[class*="overflow-y-auto"] p,
+main div[class*="overflow-y-auto"] span,
+main div[class*="overflow-y-auto"] div:not([class*="rounded"]) {
+  color: #111827 !important;
+  text-shadow: none !important;
+}
+
+/* Hold Mic / chat composer bar gets fl-2 */
+main div[class*="rounded"]:has(textarea),
+main div[class*="rounded"]:has(input[placeholder*="Sweetie" i]),
+main div[class*="rounded"]:has(input[placeholder*="Ask" i]),
+main div[class*="rounded"]:has(button:has(svg)):has(input) {
+  background-color: transparent !important;
+  background-image: var(--fl-2) !important;
+  background-size: 110px 110px !important;
+  background-repeat: repeat !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: var(--ultra-dark-shadow-lg) !important;
 }
 
 /* =========================================================
