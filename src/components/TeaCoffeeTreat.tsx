@@ -13,6 +13,23 @@ export default function TeaCoffeeTreat({
   const [userName, setUserName] = useState<string>(defaultName);
   const [animKey, setAnimKey] = useState<number>(0);
 
+  // Load Google's <model-viewer> script once on the client
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (customElements.get("model-viewer")) return;
+    const existing = document.querySelector(
+      'script[data-model-viewer="true"]'
+    );
+    if (existing) return;
+
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src =
+      "https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js";
+    script.setAttribute("data-model-viewer", "true");
+    document.head.appendChild(script);
+  }, []);
+
   // Sync if user signs in via Google/Guestbook or has a saved name in localStorage
   useEffect(() => {
     if (defaultName && defaultName.trim()) {
@@ -46,6 +63,7 @@ export default function TeaCoffeeTreat({
 
   const displayName = userName.trim() || "Sweet Guest";
   const isTea = selected === "tea";
+  const modelSrc = isTea ? "/models/tea.glb" : "/models/coffee.glb";
 
   return (
     <div className="mt-4 flex flex-col items-center gap-3 w-full max-w-md mx-auto">
@@ -68,7 +86,7 @@ export default function TeaCoffeeTreat({
         </button>
       </div>
 
-      {/* Animated Cup + Animated User Name Card */}
+      {/* Interactive 3D Cup + Animated User Name Card */}
       {selected && (
         <div
           key={animKey}
@@ -87,118 +105,51 @@ export default function TeaCoffeeTreat({
             ✕
           </button>
 
-          {/* Animated Steam + Cup SVG */}
-          <div className="relative flex flex-col items-center justify-center pt-2">
-            {/* Rising Steam */}
-            <div className="flex items-end gap-2.5 h-8 mb-1">
+          {/* Rising Steam + Interactive 3D Model Viewer */}
+          <div className="relative w-full flex flex-col items-center justify-center">
+            {/* Subtle Rising Steam above 3D Cup */}
+            <div className="flex items-end gap-2.5 h-6 -mb-2 z-10 pointer-events-none">
               <span
-                className="w-1.5 h-6 rounded-full bg-white/80 block"
+                className="w-1.5 h-5 rounded-full bg-white/75 block"
                 style={{
                   animation: "psSteamRise 1.6s ease-in-out infinite",
                 }}
               />
               <span
-                className="w-1.5 h-7 rounded-full bg-white/90 block"
+                className="w-1.5 h-6 rounded-full bg-white/85 block"
                 style={{
                   animation: "psSteamRise 1.6s ease-in-out 0.35s infinite",
                 }}
               />
               <span
-                className="w-1.5 h-5 rounded-full bg-white/75 block"
+                className="w-1.5 h-4 rounded-full bg-white/70 block"
                 style={{
                   animation: "psSteamRise 1.6s ease-in-out 0.7s infinite",
                 }}
               />
             </div>
 
-            {/* Animated Cup Filling with Tea or Coffee */}
-            <svg
-              width="124"
-              height="104"
-              viewBox="0 0 124 104"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              className="drop-shadow-[0_10px_18px_rgba(0,0,0,0.85)]"
-            >
-              <defs>
-                <clipPath id={`cupBowlClip-${animKey}`}>
-                  <path d="M22 22 H90 V56 C90 76 74 90 56 90 C38 90 22 76 22 56 Z" />
-                </clipPath>
-                <linearGradient
-                  id={`liquidGrad-${animKey}`}
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  {isTea ? (
-                    <>
-                      <stop offset="0%" stopColor="#e59a4c" />
-                      <stop offset="55%" stopColor="#b96524" />
-                      <stop offset="100%" stopColor="#7c3a10" />
-                    </>
-                  ) : (
-                    <>
-                      <stop offset="0%" stopColor="#8b5a3c" />
-                      <stop offset="50%" stopColor="#4b2816" />
-                      <stop offset="100%" stopColor="#261107" />
-                    </>
-                  )}
-                </linearGradient>
-              </defs>
-
-              {/* Saucer */}
-              <ellipse
-                cx="56"
-                cy="95"
-                rx="44"
-                ry="6"
-                fill="rgba(255,255,255,0.88)"
-              />
-
-              {/* Cup Handle */}
-              <path
-                d="M90 32 H101 C109 32 114 38 114 47 C114 56 109 62 101 62 H90"
-                stroke="#ffffff"
-                strokeWidth="7"
-                strokeLinecap="round"
-              />
-
-              {/* Cup Outer Body */}
-              <path
-                d="M20 20 H92 V56 C92 77 75 92 56 92 C37 92 20 77 20 56 Z"
-                fill="rgba(255,255,255,0.22)"
-                stroke="#ffffff"
-                strokeWidth="4"
-              />
-
-              {/* Liquid Filling Up Inside Cup */}
-              <g clipPath={`url(#cupBowlClip-${animKey})`}>
-                <rect
-                  x="18"
-                  y="28"
-                  width="76"
-                  height="66"
-                  fill={`url(#liquidGrad-${animKey})`}
-                  style={{
-                    transformOrigin: "56px 90px",
-                    animation:
-                      "psLiquidFill 1.15s cubic-bezier(0.22, 1, 0.36, 1) forwards",
-                  }}
-                />
-                {/* Crema / Milk Foam Top Rim */}
-                <ellipse
-                  cx="56"
-                  cy="31"
-                  rx="33"
-                  ry="4.5"
-                  fill={isTea ? "#f5c58e" : "#c89d7c"}
-                  style={{
-                    animation: "psFoamFade 1.25s ease-out forwards",
-                  }}
-                />
-              </g>
-            </svg>
+            {/* Real 3D .glb Model */}
+            <div className="w-full h-56 sm:h-64 flex items-center justify-center">
+              {React.createElement("model-viewer" as any, {
+                src: modelSrc,
+                alt: isTea ? "3D Tea Cup" : "3D Coffee Cup",
+                "auto-rotate": true,
+                "rotation-per-second": "28deg",
+                "camera-controls": true,
+                "disable-zoom": false,
+                "shadow-intensity": "1.2",
+                "shadow-softness": "0.8",
+                exposure: "1.1",
+                "interaction-prompt": "none",
+                loading: "eager",
+                style: {
+                  width: "100%",
+                  height: "100%",
+                  backgroundColor: "transparent",
+                },
+              })}
+            </div>
           </div>
 
           {/* Animated User Name Badge */}
@@ -217,6 +168,10 @@ export default function TeaCoffeeTreat({
             {isTea
               ? `Fresh hot masala chai brewed with warmth for ${displayName}!`
               : `Rich hot coffee brewed with love for ${displayName}!`}
+          </p>
+
+          <p className="text-[11px] opacity-80">
+            Drag to rotate the 3D cup
           </p>
 
           {/* Optional quick name input so any visitor can personalize their cup */}
