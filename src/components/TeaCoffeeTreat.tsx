@@ -31,7 +31,7 @@ function Cup3DScene({
     // Scene, Camera, Renderer
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
-    camera.position.set(1.9, 1.75, 2.7);
+    camera.position.set(1.85, 1.7, 2.65);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -151,7 +151,7 @@ function Cup3DScene({
         rootGroup.add(model);
         model.updateMatrixWorld(true);
 
-        // Find the cup mesh to compute the exact bowl center (ignoring the handle)
+        // Find the cup mesh to compute the exact bowl center and full rim radius
         let cupMesh: THREE.Mesh | null = null;
         model.traverse((obj) => {
           if (!cupMesh && (obj as THREE.Mesh).isMesh) {
@@ -159,11 +159,9 @@ function Cup3DScene({
           }
         });
 
-        let bowlCenterX = 0;
-        let bowlCenterZ = 0;
-        let bowlBottomY = -0.25;
+        let bowlBottomY = -0.35;
         let bowlTopY = 0.85;
-        let innerRadius = 0.45;
+        let rimRadius = 0.55;
 
         if (cupMesh) {
           const mesh = cupMesh as THREE.Mesh;
@@ -171,46 +169,39 @@ function Cup3DScene({
           const gBox = mesh.geometry.boundingBox;
 
           if (gBox) {
-            // In Kid Cup's local geometry: X is [-1, 1] (no handle), Y has handle [-1.519, 1], Z is height [-0.484, 1]
             const localBottom = new THREE.Vector3(0, 0, gBox.min.z).applyMatrix4(
               mesh.matrixWorld
             );
             const localTop = new THREE.Vector3(0, 0, gBox.max.z).applyMatrix4(
               mesh.matrixWorld
             );
-            const localRimEdge = new THREE.Vector3(
-              gBox.max.x,
-              0,
-              gBox.max.z
-            ).applyMatrix4(mesh.matrixWorld);
 
-            // Shift model so the bowl center sits cleanly at world X=0, Z=0
+            // Center the circular bowl cleanly at world X=0, Z=0 (ignoring handle)
             model.position.x -= localTop.x;
             model.position.z -= localTop.z;
             model.updateMatrixWorld(true);
 
-            bowlCenterX = 0;
-            bowlCenterZ = 0;
+            // Recompute world box after centering; X-axis has no handle so it gives exact bowl diameter
+            const finalBox = new THREE.Box3().setFromObject(model);
+            rimRadius = (finalBox.max.x - finalBox.min.x) * 0.5;
             bowlBottomY = localBottom.y;
             bowlTopY = localTop.y;
-
-            const outerRadius = localRimEdge.distanceTo(localTop);
-            // Slightly inset so liquid stays flush inside the inner cup wall without clipping
-            innerRadius = outerRadius * 0.84;
           }
         }
 
         const cupHeight = Math.max(0.2, bowlTopY - bowlBottomY);
-        cupBottomY = bowlBottomY + cupHeight * 0.08;
-        maxLiquidHeight = cupHeight * 0.78;
+        const liquidTopRadius = rimRadius * 0.93;
+        const liquidBottomRadius = rimRadius * 0.8;
+        cupBottomY = bowlBottomY + cupHeight * 0.06;
+        maxLiquidHeight = cupHeight * 0.84;
         streamTopY = bowlTopY + 1.1;
 
-        // 1. Liquid body cylinder (scales up smoothly from bottom of bowl)
+        // 1. Liquid body cylinder (fills flush against inner wall from bottom to top)
         const liquidGeo = new THREE.CylinderGeometry(
-          innerRadius,
-          innerRadius * 0.92,
+          liquidTopRadius,
+          liquidBottomRadius,
           1,
-          40
+          48
         );
         liquidGeo.translate(0, 0.5, 0); // pivot at bottom
         const liquidMat = new THREE.MeshStandardMaterial({
@@ -219,16 +210,16 @@ function Cup3DScene({
           metalness: 0.06,
         });
         liquidMesh = new THREE.Mesh(liquidGeo, liquidMat);
-        liquidMesh.position.set(bowlCenterX, cupBottomY, bowlCenterZ);
+        liquidMesh.position.set(0, cupBottomY, 0);
         liquidMesh.scale.set(1, 0.01, 1);
         rootGroup.add(liquidMesh);
 
-        // 2. Creamy foam / surface disc on top of the liquid
+        // 2. Creamy foam / surface disc matching exact top radius
         const foamGeo = new THREE.CylinderGeometry(
-          innerRadius * 0.99,
-          innerRadius * 0.97,
-          0.03,
-          40
+          liquidTopRadius,
+          liquidTopRadius * 0.99,
+          0.028,
+          48
         );
         const foamMat = new THREE.MeshStandardMaterial({
           color: foamColor,
@@ -236,8 +227,8 @@ function Cup3DScene({
           metalness: 0.02,
         });
         foamMesh = new THREE.Mesh(foamGeo, foamMat);
-        foamMesh.position.set(bowlCenterX, cupBottomY + 0.01, bowlCenterZ);
-        foamMesh.scale.set(0.01, 1, 0.01);
+        foamMesh.position.set(0, cupBottomY + 0.01, 0);
+        foamMesh.scale.set(0.86, 1, 0.86);
         rootGroup.add(foamMesh);
 
         // 3. Pouring stream from above directly into the bowl center
@@ -257,11 +248,11 @@ function Cup3DScene({
           opacity: 0.95,
         });
         streamMesh = new THREE.Mesh(streamGeo, streamMat);
-        streamMesh.position.set(bowlCenterX, streamTopY, bowlCenterZ);
+        streamMesh.position.set(0, streamTopY, 0);
         rootGroup.add(streamMesh);
 
         // Position steam above cup rim
-        steamGroup.position.set(bowlCenterX, bowlTopY - 0.05, bowlCenterZ);
+        steamGroup.position.set(0, bowlTopY - 0.04, 0);
 
         setLoading(false);
       },
@@ -287,9 +278,9 @@ function Cup3DScene({
         const currentH = Math.max(0.01, eased * maxLiquidHeight);
         liquidMesh.scale.y = currentH;
 
-        const wobble = Math.sin(elapsed * 5.5) * 0.006 * (1 - progress * 0.65);
+        const wobble = Math.sin(elapsed * 5.5) * 0.005 * (1 - progress * 0.65);
         foamMesh.position.y = cupBottomY + currentH + wobble;
-        const foamScale = 0.9 + 0.1 * eased;
+        const foamScale = 0.86 + 0.14 * eased;
         foamMesh.scale.set(foamScale, 1, foamScale);
       }
 
