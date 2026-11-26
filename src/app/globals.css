@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — ALL BUTTONS ON FL-3.JPG + DEEP 3D SHADOWS
+   PARVATI-SITE — FL-1 CARDS, FL-2 BG, FL-3 BUTTONS, FL-4 MESSAGES
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
   --fl-2: url("/textures/fl-2.jpg");
   --fl-3: url("/textures/fl-3.jpg");
+  --fl-4: url("/textures/fl-4.jpg");
 
   /* Level 1: Main cards, nav pill & footer — tallest lift */
   --shadow-3d-l1:
@@ -106,7 +107,7 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   LEVEL 2 — SUB-BOXES, INPUTS & COMMENTS (fl-1 + 3D SHADOW)
+   LEVEL 2 — SUB-BOXES & INPUTS (fl-1 + 3D SHADOW)
    ========================================================= */
 main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
 main article [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
@@ -115,6 +116,20 @@ main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([t
 main textarea,
 main select {
   background-size: 72px 72px !important;
+  box-shadow: var(--shadow-3d-l2) !important;
+}
+
+/* =========================================================
+   USER GUESTBOOK MESSAGE BOXES — FL-4.JPG TEXTURE + 3D SHADOW
+   ========================================================= */
+main [class*="overflow-y"] > div[class*="rounded"],
+main [class*="overflow-auto"] > div[class*="rounded"],
+main [class*="max-h-"] > div[class*="rounded"],
+main [class*="rounded"] [class*="space-y"] > div[class*="rounded"]:has(button) {
+  background-color: transparent !important;
+  background-image: var(--fl-4) !important;
+  background-size: 72px 72px !important;
+  background-repeat: repeat !important;
   box-shadow: var(--shadow-3d-l2) !important;
 }
 
