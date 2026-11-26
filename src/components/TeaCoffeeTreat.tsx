@@ -7,6 +7,48 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 type DrinkType = "tea" | "coffee" | null;
 
+function createCupFlowersTexture(): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1024;
+  canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+
+  if (ctx) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // Staggered rows of small 🌸 flowers wrapping 360° around all sides of the cup
+    const rows = 5;
+    const cols = 12;
+    const cellW = canvas.width / cols;
+    const cellH = canvas.height / rows;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const offsetX = r % 2 === 0 ? 0 : cellW * 0.5;
+        const x = (c * cellW + offsetX + cellW * 0.5) % canvas.width;
+        const y = r * cellH + cellH * 0.5;
+        const size = 24 + ((r + c) % 3) * 4; // small, delicate print
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate((((r * 7 + c * 13) % 9) - 4) * 0.12);
+        ctx.globalAlpha = 0.86;
+        ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+        ctx.fillText("🌸", 0, 0);
+        ctx.restore();
+      }
+    }
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 function createCupNameCanvas(name: string): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
   canvas.width = 1024;
@@ -24,7 +66,7 @@ function drawCupName(canvas: HTMLCanvasElement, name: string) {
   const label = (name.trim() || "Sweet Guest").slice(0, 24);
 
   // Subtle decorative divider lines above & below the printed name
-  ctx.strokeStyle = "rgba(255, 248, 230, 0.75)";
+  ctx.strokeStyle = "rgba(255, 248, 230, 0.78)";
   ctx.lineWidth = 4;
   ctx.beginPath();
   ctx.moveTo(260, 62);
@@ -34,17 +76,17 @@ function drawCupName(canvas: HTMLCanvasElement, name: string) {
   ctx.stroke();
 
   // Dynamic font size so long names fit cleanly on the cup
-  let fontSize = 86;
-  if (label.length > 14) fontSize = 68;
-  if (label.length > 19) fontSize = 56;
+  let fontSize = 84;
+  if (label.length > 14) fontSize = 66;
+  if (label.length > 19) fontSize = 54;
 
   ctx.font = `900 ${fontSize}px Georgia, "Times New Roman", serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
   // Crisp shadow + warm cream-white ceramic print
-  ctx.shadowColor = "rgba(0, 0, 0, 0.55)";
-  ctx.shadowBlur = 10;
+  ctx.shadowColor = "rgba(0, 0, 0, 0.65)";
+  ctx.shadowBlur = 12;
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 4;
   ctx.fillStyle = "#fff9eb";
@@ -53,7 +95,7 @@ function drawCupName(canvas: HTMLCanvasElement, name: string) {
   // Subtle gold highlight stroke
   ctx.shadowColor = "transparent";
   ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(255, 224, 160, 0.7)";
+  ctx.strokeStyle = "rgba(255, 224, 160, 0.75)";
   ctx.strokeText(label, canvas.width / 2, canvas.height / 2 + 2);
 }
 
@@ -97,9 +139,17 @@ function createHeartLatteTexture(isTea: boolean): THREE.CanvasTexture {
     };
 
     // Soft foam edge + bright creamy center + subtle inner swirl
-    drawHeart(1.06, isTea ? "rgba(255, 236, 209, 0.65)" : "rgba(248, 232, 210, 0.7)", 6);
+    drawHeart(
+      1.06,
+      isTea ? "rgba(255, 236, 209, 0.65)" : "rgba(248, 232, 210, 0.7)",
+      6
+    );
     drawHeart(0.95, isTea ? "#fff5e6" : "#fff7eb", 2);
-    drawHeart(0.55, isTea ? "rgba(218, 146, 78, 0.35)" : "rgba(130, 74, 42, 0.38)", 4);
+    drawHeart(
+      0.55,
+      isTea ? "rgba(218, 146, 78, 0.35)" : "rgba(130, 74, 42, 0.38)",
+      4
+    );
     drawHeart(0.32, "#fffaf2", 1.5);
 
     ctx.restore();
@@ -120,7 +170,6 @@ function createSteamWispTexture(): THREE.CanvasTexture {
   if (ctx) {
     ctx.clearRect(0, 0, 256, 256);
 
-    // Layered organic soft puffs for realistic curling steam
     const puffs = [
       { x: 128, y: 128, r: 92, a: 0.28 },
       { x: 102, y: 112, r: 64, a: 0.22 },
@@ -228,11 +277,11 @@ function Cup3DScene({
 
     // Drink colors
     const isTea = drink === "tea";
-    const liquidColor = isTea ? 0xb85d19 : 0x3b1d0e; // Masala chai vs dark coffee
-    const foamColor = isTea ? 0xde9e5b : 0x6f4329; // Warm chai surface vs espresso crema
+    const liquidColor = isTea ? 0xb85d19 : 0x3b1d0e;
+    const foamColor = isTea ? 0xde9e5b : 0x6f4329;
     const streamColor = isTea ? 0xc96b24 : 0x4a2411;
 
-    // Group that holds the cup + printed name + liquid + heart + pour stream + steam
+    // Group that holds the cup + flower wrap + side name + liquid + heart + stream + steam
     const rootGroup = new THREE.Group();
     scene.add(rootGroup);
 
@@ -245,6 +294,7 @@ function Cup3DScene({
     let streamTopY = 2.4;
 
     // Procedural textures
+    const flowerTexture = createCupFlowersTexture();
     const steamTexture = createSteamWispTexture();
     const heartTexture = createHeartLatteTexture(isTea);
     const nameCanvas = createCupNameCanvas(displayName);
@@ -366,32 +416,57 @@ function Cup3DScene({
         maxLiquidHeight = cupHeight * 0.84;
         streamTopY = bowlTopY + 1.1;
 
-        // 1. Curved Printed Name wrapped cleanly around the front outer wall of the cup
-        const labelHeight = cupHeight * 0.34;
+        // 1. Small 🌸 flower print wrapped 360° around ALL sides of the cup
+        const flowerWrapHeight = cupHeight * 0.78;
+        const flowerWrapGeo = new THREE.CylinderGeometry(
+          rimRadius * 1.008,
+          rimRadius * 0.94,
+          flowerWrapHeight,
+          64,
+          1,
+          true,
+          0,
+          Math.PI * 2
+        );
+        const flowerWrapMat = new THREE.MeshStandardMaterial({
+          map: flowerTexture,
+          transparent: true,
+          roughness: 0.35,
+          metalness: 0.04,
+          depthWrite: false,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+        });
+        const flowerWrapMesh = new THREE.Mesh(flowerWrapGeo, flowerWrapMat);
+        flowerWrapMesh.position.set(0, bowlBottomY + cupHeight * 0.52, 0);
+        rootGroup.add(flowerWrapMesh);
+
+        // 2. Curved Printed Name positioned slightly to the side (not dead-center front)
+        const labelHeight = cupHeight * 0.32;
         const labelGeo = new THREE.CylinderGeometry(
-          rimRadius * 1.012,
-          rimRadius * 0.985,
+          rimRadius * 1.018,
+          rimRadius * 0.99,
           labelHeight,
           48,
           1,
           true,
-          -Math.PI * 0.42,
-          Math.PI * 0.84
+          -Math.PI * 0.14, // shifted to the side
+          Math.PI * 0.76
         );
         const labelMat = new THREE.MeshStandardMaterial({
           map: nameTexture,
           transparent: true,
-          roughness: 0.35,
+          roughness: 0.32,
           metalness: 0.05,
           depthWrite: false,
           polygonOffset: true,
-          polygonOffsetFactor: -2,
+          polygonOffsetFactor: -3,
         });
         const labelMesh = new THREE.Mesh(labelGeo, labelMat);
         labelMesh.position.set(0, bowlBottomY + cupHeight * 0.54, 0);
         rootGroup.add(labelMesh);
 
-        // 2. Liquid body cylinder (fills flush against inner wall from bottom to top)
+        // 3. Liquid body cylinder (fills flush against inner wall from bottom to top)
         const liquidGeo = new THREE.CylinderGeometry(
           liquidTopRadius,
           liquidBottomRadius,
@@ -409,7 +484,7 @@ function Cup3DScene({
         liquidMesh.scale.set(1, 0.01, 1);
         rootGroup.add(liquidMesh);
 
-        // 3. Top liquid / crema surface disc
+        // 4. Top liquid / crema surface disc
         const foamGeo = new THREE.CylinderGeometry(
           liquidTopRadius,
           liquidTopRadius * 0.99,
@@ -426,7 +501,7 @@ function Cup3DScene({
         foamMesh.scale.set(0.86, 1, 0.86);
         rootGroup.add(foamMesh);
 
-        // 4. Latte-art Heart on top surface (blooms at the end of the pour)
+        // 5. Latte-art Heart on top surface (blooms at the end of the pour)
         const heartGeo = new THREE.CircleGeometry(liquidTopRadius * 0.9, 48);
         heartGeo.rotateX(-Math.PI / 2);
         const heartMat = new THREE.MeshBasicMaterial({
@@ -440,7 +515,7 @@ function Cup3DScene({
         heartMesh.scale.setScalar(0.25);
         rootGroup.add(heartMesh);
 
-        // 5. Pouring stream from above directly into the bowl center
+        // 6. Pouring stream from above directly into the bowl center
         const streamHeight = Math.max(0.5, streamTopY - cupBottomY);
         const streamGeo = new THREE.CylinderGeometry(
           0.028,
@@ -475,7 +550,7 @@ function Cup3DScene({
 
     // Animation loop (Pour -> Fill -> Heart Latte-Art -> Realistic Steam)
     let rafId = 0;
-    const FILL_DURATION = 2.6; // seconds to fill cup
+    const FILL_DURATION = 2.6;
 
     const animate = (now: number) => {
       rafId = requestAnimationFrame(animate);
@@ -493,7 +568,6 @@ function Cup3DScene({
         const foamScale = 0.86 + 0.14 * eased;
         foamMesh.scale.set(foamScale, 1, foamScale);
 
-        // Bloom the heart latte-art right at the final pour
         if (heartMesh) {
           heartMesh.position.y = surfaceY + 0.016;
           const heartProgress = Math.max(
@@ -521,23 +595,23 @@ function Cup3DScene({
         }
       }
 
-      // Realistic curling, rising steam once cup is warming up
       const steamStrength = Math.max(0, (progress - 0.28) / 0.72);
       for (const wisp of steamWisps) {
         const life = (elapsed * wisp.speed + wisp.phase) % 1.8;
-        const t = life / 1.8; // 0 -> 1
+        const t = life / 1.8;
         wisp.sprite.position.y = t * 1.15;
         wisp.sprite.position.x =
-          wisp.baseX + Math.sin(elapsed * 1.4 + wisp.phase * 4) * (0.04 + t * 0.12);
+          wisp.baseX +
+          Math.sin(elapsed * 1.4 + wisp.phase * 4) * (0.04 + t * 0.12);
         wisp.sprite.position.z =
-          wisp.baseZ + Math.cos(elapsed * 1.1 + wisp.phase * 3) * (0.03 + t * 0.08);
+          wisp.baseZ +
+          Math.cos(elapsed * 1.1 + wisp.phase * 3) * (0.03 + t * 0.08);
 
         const s = (0.28 + t * 1.05) * wisp.maxScale;
         wisp.sprite.scale.set(s, s * 1.25, 1);
 
         const mat = wisp.sprite.material as THREE.SpriteMaterial;
         mat.rotation = wisp.phase + elapsed * wisp.rotSpeed;
-        // Smooth fade-in then gentle dissipate at top
         const alphaCurve = Math.sin(t * Math.PI) * (1 - t * 0.35);
         mat.opacity = steamStrength * alphaCurve * 0.42;
       }
@@ -563,6 +637,7 @@ function Cup3DScene({
       disposed = true;
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", handleResize);
+      flowerTexture.dispose();
       steamTexture.dispose();
       heartTexture.dispose();
       nameTexture.dispose();
@@ -600,7 +675,6 @@ export default function TeaCoffeeTreat({
   const [userName, setUserName] = useState<string>(defaultName);
   const [animKey, setAnimKey] = useState<number>(0);
 
-  // Sync if user signs in via Google/Guestbook or has a saved name in localStorage
   useEffect(() => {
     if (defaultName && defaultName.trim()) {
       setUserName(defaultName.trim());
@@ -655,7 +729,7 @@ export default function TeaCoffeeTreat({
         </button>
       </div>
 
-      {/* Interactive 3D Cup with Printed Name, Pouring, Heart Art & Realistic Steam */}
+      {/* Interactive 3D Cup with Floral Print, Side Name, Pouring, Heart Art & Steam */}
       {selected && (
         <div
           key={animKey}
@@ -683,7 +757,7 @@ export default function TeaCoffeeTreat({
             </button>
           </div>
 
-          {/* 3D Cup + Printed Name + Pour + Heart + Realistic Steam */}
+          {/* 3D Cup + Floral Print + Side Name + Pour + Heart + Realistic Steam */}
           <Cup3DScene
             drink={selected}
             displayName={displayName}
@@ -712,7 +786,7 @@ export default function TeaCoffeeTreat({
             Drag to rotate the 3D cup (180° view)
           </p>
 
-          {/* Quick name input — updates the name printed on the 3D cup live */}
+          {/* Quick name input — updates the name printed on the side of the 3D cup live */}
           <input
             type="text"
             value={userName}

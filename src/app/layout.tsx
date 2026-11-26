@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import FlowerBurst from "@/components/FlowerBurst";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({
@@ -29,6 +30,7 @@ export default function RootLayout({
       className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen flex flex-col bg-gradient-to-br from-rose-50 via-white to-pink-50 text-slate-900 antialiased relative">
+        <FlowerBurst />
         <Navbar />
         <main className="flex-1 w-full max-w-5xl mx-auto px-4 sm:px-6 pt-24 pb-16">
           {children}
