@@ -31,7 +31,7 @@ function Cup3DScene({
     // Scene, Camera, Renderer
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
-    camera.position.set(0, 1.55, 3.6);
+    camera.position.set(1.9, 1.75, 2.7);
 
     const renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -50,10 +50,10 @@ function Cup3DScene({
     controls.enableDamping = true;
     controls.dampingFactor = 0.06;
     controls.enablePan = false;
-    controls.minDistance = 2.2;
+    controls.minDistance = 2.0;
     controls.maxDistance = 6.0;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 1.6;
+    controls.autoRotateSpeed = 1.5;
     controls.target.set(0, 0.25, 0);
 
     // Studio Lighting
@@ -99,7 +99,7 @@ function Cup3DScene({
       baseZ: number;
     }[] = [];
 
-    const steamGeo = new THREE.SphereGeometry(0.08, 12, 12);
+    const steamGeo = new THREE.SphereGeometry(0.075, 12, 12);
     for (let i = 0; i < 8; i++) {
       const steamMat = new THREE.MeshBasicMaterial({
         color: 0xffffff,
@@ -108,9 +108,9 @@ function Cup3DScene({
         depthWrite: false,
       });
       const puff = new THREE.Mesh(steamGeo, steamMat);
-      const baseX = (Math.random() - 0.5) * 0.28;
-      const baseZ = (Math.random() - 0.5) * 0.28;
-      puff.position.set(baseX, 0.8 + i * 0.15, baseZ);
+      const baseX = (Math.random() - 0.5) * 0.24;
+      const baseZ = (Math.random() - 0.5) * 0.24;
+      puff.position.set(baseX, 0.1 + i * 0.14, baseZ);
       steamGroup.add(puff);
       steamPuffs.push({
         mesh: puff,
@@ -136,90 +136,132 @@ function Cup3DScene({
 
         const model = gltf.scene;
 
-        // Normalize size & center the cup
+        // Normalize overall scale
         const box = new THREE.Box3().setFromObject(model);
         const size = new THREE.Vector3();
-        const center = new THREE.Vector3();
         box.getSize(size);
-        box.getCenter(center);
-
         const maxDim = Math.max(size.x, size.y, size.z) || 1;
         const scale = 1.65 / maxDim;
         model.scale.setScalar(scale);
 
-        // Recompute scaled bounds
+        // Place bottom of cup at y = -0.35
         const scaledBox = new THREE.Box3().setFromObject(model);
-        const scaledSize = new THREE.Vector3();
-        const scaledCenter = new THREE.Vector3();
-        scaledBox.getSize(scaledSize);
-        scaledBox.getCenter(scaledCenter);
-
-        // Place bottom of cup at y = -0.35, centered on X/Z
-        model.position.x -= scaledCenter.x;
-        model.position.z -= scaledCenter.z;
         model.position.y -= scaledBox.min.y + 0.35;
 
         rootGroup.add(model);
+        model.updateMatrixWorld(true);
 
-        // Compute interior dimensions for liquid based on cup size
-        const cupHeight = scaledSize.y;
-        const cupRadius = Math.min(scaledSize.x, scaledSize.z) * 0.34;
-        cupBottomY = -0.35 + cupHeight * 0.14;
-        maxLiquidHeight = cupHeight * 0.66;
-        streamTopY = -0.35 + cupHeight + 1.15;
+        // Find the cup mesh to compute the exact bowl center (ignoring the handle)
+        let cupMesh: THREE.Mesh | null = null;
+        model.traverse((obj) => {
+          if (!cupMesh && (obj as THREE.Mesh).isMesh) {
+            cupMesh = obj as THREE.Mesh;
+          }
+        });
 
-        // 1. Liquid body cylinder (scales up from bottom)
+        let bowlCenterX = 0;
+        let bowlCenterZ = 0;
+        let bowlBottomY = -0.25;
+        let bowlTopY = 0.85;
+        let innerRadius = 0.45;
+
+        if (cupMesh) {
+          const mesh = cupMesh as THREE.Mesh;
+          mesh.geometry.computeBoundingBox();
+          const gBox = mesh.geometry.boundingBox;
+
+          if (gBox) {
+            // In Kid Cup's local geometry: X is [-1, 1] (no handle), Y has handle [-1.519, 1], Z is height [-0.484, 1]
+            const localBottom = new THREE.Vector3(0, 0, gBox.min.z).applyMatrix4(
+              mesh.matrixWorld
+            );
+            const localTop = new THREE.Vector3(0, 0, gBox.max.z).applyMatrix4(
+              mesh.matrixWorld
+            );
+            const localRimEdge = new THREE.Vector3(
+              gBox.max.x,
+              0,
+              gBox.max.z
+            ).applyMatrix4(mesh.matrixWorld);
+
+            // Shift model so the bowl center sits cleanly at world X=0, Z=0
+            model.position.x -= localTop.x;
+            model.position.z -= localTop.z;
+            model.updateMatrixWorld(true);
+
+            bowlCenterX = 0;
+            bowlCenterZ = 0;
+            bowlBottomY = localBottom.y;
+            bowlTopY = localTop.y;
+
+            const outerRadius = localRimEdge.distanceTo(localTop);
+            // Slightly inset so liquid stays flush inside the inner cup wall without clipping
+            innerRadius = outerRadius * 0.84;
+          }
+        }
+
+        const cupHeight = Math.max(0.2, bowlTopY - bowlBottomY);
+        cupBottomY = bowlBottomY + cupHeight * 0.08;
+        maxLiquidHeight = cupHeight * 0.78;
+        streamTopY = bowlTopY + 1.1;
+
+        // 1. Liquid body cylinder (scales up smoothly from bottom of bowl)
         const liquidGeo = new THREE.CylinderGeometry(
-          cupRadius * 0.96,
-          cupRadius * 0.72,
+          innerRadius,
+          innerRadius * 0.92,
           1,
-          36
+          40
         );
         liquidGeo.translate(0, 0.5, 0); // pivot at bottom
         const liquidMat = new THREE.MeshStandardMaterial({
           color: liquidColor,
-          roughness: 0.18,
-          metalness: 0.08,
+          roughness: 0.16,
+          metalness: 0.06,
         });
         liquidMesh = new THREE.Mesh(liquidGeo, liquidMat);
-        liquidMesh.position.set(0, cupBottomY, 0);
+        liquidMesh.position.set(bowlCenterX, cupBottomY, bowlCenterZ);
         liquidMesh.scale.set(1, 0.01, 1);
         rootGroup.add(liquidMesh);
 
         // 2. Creamy foam / surface disc on top of the liquid
         const foamGeo = new THREE.CylinderGeometry(
-          cupRadius * 0.97,
-          cupRadius * 0.95,
-          0.035,
-          36
+          innerRadius * 0.99,
+          innerRadius * 0.97,
+          0.03,
+          40
         );
         const foamMat = new THREE.MeshStandardMaterial({
           color: foamColor,
-          roughness: 0.45,
+          roughness: 0.42,
           metalness: 0.02,
         });
         foamMesh = new THREE.Mesh(foamGeo, foamMat);
-        foamMesh.position.set(0, cupBottomY + 0.01, 0);
+        foamMesh.position.set(bowlCenterX, cupBottomY + 0.01, bowlCenterZ);
         foamMesh.scale.set(0.01, 1, 0.01);
         rootGroup.add(foamMesh);
 
-        // 3. Pouring stream from above into the cup
+        // 3. Pouring stream from above directly into the bowl center
         const streamHeight = Math.max(0.5, streamTopY - cupBottomY);
-        const streamGeo = new THREE.CylinderGeometry(0.032, 0.048, streamHeight, 16);
+        const streamGeo = new THREE.CylinderGeometry(
+          0.028,
+          0.042,
+          streamHeight,
+          16
+        );
         streamGeo.translate(0, -streamHeight / 2, 0); // pivot at top
         const streamMat = new THREE.MeshStandardMaterial({
           color: streamColor,
-          roughness: 0.15,
+          roughness: 0.14,
           metalness: 0.05,
           transparent: true,
           opacity: 0.95,
         });
         streamMesh = new THREE.Mesh(streamGeo, streamMat);
-        streamMesh.position.set(0, streamTopY, 0);
+        streamMesh.position.set(bowlCenterX, streamTopY, bowlCenterZ);
         rootGroup.add(streamMesh);
 
         // Position steam above cup rim
-        steamGroup.position.set(0, -0.35 + cupHeight * 0.9, 0);
+        steamGroup.position.set(bowlCenterX, bowlTopY - 0.05, bowlCenterZ);
 
         setLoading(false);
       },
@@ -239,17 +281,15 @@ function Cup3DScene({
       rafId = requestAnimationFrame(animate);
       const elapsed = (now - startTime) / 1000;
       const progress = Math.min(1, elapsed / FILL_DURATION);
-      // Smooth ease-out curve
       const eased = 1 - Math.pow(1 - progress, 2.2);
 
       if (liquidMesh && foamMesh) {
         const currentH = Math.max(0.01, eased * maxLiquidHeight);
         liquidMesh.scale.y = currentH;
 
-        // Subtle liquid surface wobble
-        const wobble = Math.sin(elapsed * 5.5) * 0.008 * (1 - progress * 0.6);
+        const wobble = Math.sin(elapsed * 5.5) * 0.006 * (1 - progress * 0.65);
         foamMesh.position.y = cupBottomY + currentH + wobble;
-        const foamScale = 0.72 + 0.28 * eased;
+        const foamScale = 0.9 + 0.1 * eased;
         foamMesh.scale.set(foamScale, 1, foamScale);
       }
 
@@ -259,7 +299,6 @@ function Cup3DScene({
           const pulse = 1 + Math.sin(elapsed * 18) * 0.08;
           streamMesh.scale.set(pulse, 1, pulse);
         } else if (progress < 1) {
-          // Taper stream off smoothly as cup finishes filling
           const fade = Math.max(0.01, (1 - progress) / 0.08);
           streamMesh.scale.set(fade, fade, fade);
         } else {
@@ -271,10 +310,10 @@ function Cup3DScene({
       const steamStrength = Math.max(0, (progress - 0.35) / 0.65);
       for (const puff of steamPuffs) {
         const cycle = (elapsed * puff.speed + puff.offset) % 1.4;
-        puff.mesh.position.y = cycle * 0.85;
+        puff.mesh.position.y = cycle * 0.8;
         puff.mesh.position.x =
-          puff.baseX + Math.sin(elapsed * 2 + puff.offset) * 0.08;
-        const s = 0.6 + cycle * 1.1;
+          puff.baseX + Math.sin(elapsed * 2 + puff.offset) * 0.07;
+        const s = 0.6 + cycle * 1.05;
         puff.mesh.scale.setScalar(s);
         const mat = puff.mesh.material as THREE.MeshBasicMaterial;
         mat.opacity =
@@ -309,7 +348,10 @@ function Cup3DScene({
 
   return (
     <div className="relative w-full h-60 sm:h-68 flex items-center justify-center">
-      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      <div
+        ref={mountRef}
+        className="w-full h-full cursor-grab active:cursor-grabbing"
+      />
       {loading && (
         <span className="absolute text-xs opacity-90 pointer-events-none">
           Pouring 3D {drink}...
