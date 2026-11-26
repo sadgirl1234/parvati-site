@@ -231,3 +231,60 @@ main *:not([class*="animate"]):not([style*="animation"]) {
 [style*="animation"] {
   text-shadow: none !important;
 }
+/* =========================================================
+   TEA & COFFEE CUP ANIMATIONS
+   ========================================================= */
+@keyframes psCupReveal {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes psLiquidFill {
+  0% {
+    transform: scaleY(0.05);
+  }
+  100% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes psFoamFade {
+  0%,
+  55% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0.95;
+  }
+}
+
+@keyframes psSteamRise {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scaleY(0.8);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(-4px) scaleY(1.05);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px) scaleY(0.9);
+  }
+}
+
+@keyframes psNameFloat {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-3px) scale(1.04);
+  }
+}
