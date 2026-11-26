@@ -1,8 +1,328 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 type DrinkType = "tea" | "coffee" | null;
+
+function Cup3DScene({
+  drink,
+  replayKey,
+}: {
+  drink: "tea" | "coffee";
+  replayKey: number;
+}) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container) return;
+
+    setLoading(true);
+    setErrorMsg("");
+
+    const width = container.clientWidth || 320;
+    const height = container.clientHeight || 260;
+
+    // Scene, Camera, Renderer
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(36, width / height, 0.1, 100);
+    camera.position.set(0, 1.55, 3.6);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+    });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    container.innerHTML = "";
+    container.appendChild(renderer.domElement);
+
+    // Controls (drag to rotate 360°)
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.enablePan = false;
+    controls.minDistance = 2.2;
+    controls.maxDistance = 6.0;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 1.6;
+    controls.target.set(0, 0.25, 0);
+
+    // Studio Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 1.35);
+    scene.add(ambient);
+
+    const keyLight = new THREE.DirectionalLight(0xfff5e6, 2.2);
+    keyLight.position.set(3, 5, 4);
+    scene.add(keyLight);
+
+    const rimLight = new THREE.DirectionalLight(0xffd1dc, 1.2);
+    rimLight.position.set(-4, 3, -3);
+    scene.add(rimLight);
+
+    const fillLight = new THREE.PointLight(0xffffff, 0.9);
+    fillLight.position.set(0, 2.5, 2.5);
+    scene.add(fillLight);
+
+    // Drink colors
+    const isTea = drink === "tea";
+    const liquidColor = isTea ? 0xb85d19 : 0x3b1d0e; // Masala chai vs dark coffee
+    const foamColor = isTea ? 0xf2c18d : 0xc69c72; // Creamy milk foam vs espresso crema
+    const streamColor = isTea ? 0xc96b24 : 0x4a2411;
+
+    // Group that holds the cup + animated liquid + pour stream
+    const rootGroup = new THREE.Group();
+    scene.add(rootGroup);
+
+    let liquidMesh: THREE.Mesh | null = null;
+    let foamMesh: THREE.Mesh | null = null;
+    let streamMesh: THREE.Mesh | null = null;
+    let cupBottomY = 0;
+    let maxLiquidHeight = 0.7;
+    let streamTopY = 2.4;
+
+    // Steam particles
+    const steamGroup = new THREE.Group();
+    const steamPuffs: {
+      mesh: THREE.Mesh;
+      speed: number;
+      offset: number;
+      baseX: number;
+      baseZ: number;
+    }[] = [];
+
+    const steamGeo = new THREE.SphereGeometry(0.08, 12, 12);
+    for (let i = 0; i < 8; i++) {
+      const steamMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      });
+      const puff = new THREE.Mesh(steamGeo, steamMat);
+      const baseX = (Math.random() - 0.5) * 0.28;
+      const baseZ = (Math.random() - 0.5) * 0.28;
+      puff.position.set(baseX, 0.8 + i * 0.15, baseZ);
+      steamGroup.add(puff);
+      steamPuffs.push({
+        mesh: puff,
+        speed: 0.35 + Math.random() * 0.25,
+        offset: Math.random() * Math.PI * 2,
+        baseX,
+        baseZ,
+      });
+    }
+    rootGroup.add(steamGroup);
+
+    // Load the user's .glb cup model
+    const loader = new GLTFLoader();
+    const modelUrl = isTea ? "/models/tea.glb" : "/models/coffee.glb";
+
+    let disposed = false;
+    const startTime = performance.now();
+
+    loader.load(
+      modelUrl,
+      (gltf) => {
+        if (disposed) return;
+
+        const model = gltf.scene;
+
+        // Normalize size & center the cup
+        const box = new THREE.Box3().setFromObject(model);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        const scale = 1.65 / maxDim;
+        model.scale.setScalar(scale);
+
+        // Recompute scaled bounds
+        const scaledBox = new THREE.Box3().setFromObject(model);
+        const scaledSize = new THREE.Vector3();
+        const scaledCenter = new THREE.Vector3();
+        scaledBox.getSize(scaledSize);
+        scaledBox.getCenter(scaledCenter);
+
+        // Place bottom of cup at y = -0.35, centered on X/Z
+        model.position.x -= scaledCenter.x;
+        model.position.z -= scaledCenter.z;
+        model.position.y -= scaledBox.min.y + 0.35;
+
+        rootGroup.add(model);
+
+        // Compute interior dimensions for liquid based on cup size
+        const cupHeight = scaledSize.y;
+        const cupRadius = Math.min(scaledSize.x, scaledSize.z) * 0.34;
+        cupBottomY = -0.35 + cupHeight * 0.14;
+        maxLiquidHeight = cupHeight * 0.66;
+        streamTopY = -0.35 + cupHeight + 1.15;
+
+        // 1. Liquid body cylinder (scales up from bottom)
+        const liquidGeo = new THREE.CylinderGeometry(
+          cupRadius * 0.96,
+          cupRadius * 0.72,
+          1,
+          36
+        );
+        liquidGeo.translate(0, 0.5, 0); // pivot at bottom
+        const liquidMat = new THREE.MeshStandardMaterial({
+          color: liquidColor,
+          roughness: 0.18,
+          metalness: 0.08,
+        });
+        liquidMesh = new THREE.Mesh(liquidGeo, liquidMat);
+        liquidMesh.position.set(0, cupBottomY, 0);
+        liquidMesh.scale.set(1, 0.01, 1);
+        rootGroup.add(liquidMesh);
+
+        // 2. Creamy foam / surface disc on top of the liquid
+        const foamGeo = new THREE.CylinderGeometry(
+          cupRadius * 0.97,
+          cupRadius * 0.95,
+          0.035,
+          36
+        );
+        const foamMat = new THREE.MeshStandardMaterial({
+          color: foamColor,
+          roughness: 0.45,
+          metalness: 0.02,
+        });
+        foamMesh = new THREE.Mesh(foamGeo, foamMat);
+        foamMesh.position.set(0, cupBottomY + 0.01, 0);
+        foamMesh.scale.set(0.01, 1, 0.01);
+        rootGroup.add(foamMesh);
+
+        // 3. Pouring stream from above into the cup
+        const streamHeight = Math.max(0.5, streamTopY - cupBottomY);
+        const streamGeo = new THREE.CylinderGeometry(0.032, 0.048, streamHeight, 16);
+        streamGeo.translate(0, -streamHeight / 2, 0); // pivot at top
+        const streamMat = new THREE.MeshStandardMaterial({
+          color: streamColor,
+          roughness: 0.15,
+          metalness: 0.05,
+          transparent: true,
+          opacity: 0.95,
+        });
+        streamMesh = new THREE.Mesh(streamGeo, streamMat);
+        streamMesh.position.set(0, streamTopY, 0);
+        rootGroup.add(streamMesh);
+
+        // Position steam above cup rim
+        steamGroup.position.set(0, -0.35 + cupHeight * 0.9, 0);
+
+        setLoading(false);
+      },
+      undefined,
+      () => {
+        if (disposed) return;
+        setLoading(false);
+        setErrorMsg(`Could not load ${modelUrl}`);
+      }
+    );
+
+    // Animation loop (Pour -> Fill -> Steam)
+    let rafId = 0;
+    const FILL_DURATION = 2.6; // seconds to fill cup
+
+    const animate = (now: number) => {
+      rafId = requestAnimationFrame(animate);
+      const elapsed = (now - startTime) / 1000;
+      const progress = Math.min(1, elapsed / FILL_DURATION);
+      // Smooth ease-out curve
+      const eased = 1 - Math.pow(1 - progress, 2.2);
+
+      if (liquidMesh && foamMesh) {
+        const currentH = Math.max(0.01, eased * maxLiquidHeight);
+        liquidMesh.scale.y = currentH;
+
+        // Subtle liquid surface wobble
+        const wobble = Math.sin(elapsed * 5.5) * 0.008 * (1 - progress * 0.6);
+        foamMesh.position.y = cupBottomY + currentH + wobble;
+        const foamScale = 0.72 + 0.28 * eased;
+        foamMesh.scale.set(foamScale, 1, foamScale);
+      }
+
+      if (streamMesh) {
+        if (progress < 0.92) {
+          streamMesh.visible = true;
+          const pulse = 1 + Math.sin(elapsed * 18) * 0.08;
+          streamMesh.scale.set(pulse, 1, pulse);
+        } else if (progress < 1) {
+          // Taper stream off smoothly as cup finishes filling
+          const fade = Math.max(0.01, (1 - progress) / 0.08);
+          streamMesh.scale.set(fade, fade, fade);
+        } else {
+          streamMesh.visible = false;
+        }
+      }
+
+      // Animate rising steam once cup is at least 35% full
+      const steamStrength = Math.max(0, (progress - 0.35) / 0.65);
+      for (const puff of steamPuffs) {
+        const cycle = (elapsed * puff.speed + puff.offset) % 1.4;
+        puff.mesh.position.y = cycle * 0.85;
+        puff.mesh.position.x =
+          puff.baseX + Math.sin(elapsed * 2 + puff.offset) * 0.08;
+        const s = 0.6 + cycle * 1.1;
+        puff.mesh.scale.setScalar(s);
+        const mat = puff.mesh.material as THREE.MeshBasicMaterial;
+        mat.opacity =
+          steamStrength * Math.sin((cycle / 1.4) * Math.PI) * 0.32;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    };
+
+    rafId = requestAnimationFrame(animate);
+
+    const handleResize = () => {
+      if (!container) return;
+      const w = container.clientWidth || 320;
+      const h = container.clientHeight || 260;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      disposed = true;
+      cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", handleResize);
+      controls.dispose();
+      renderer.dispose();
+    };
+  }, [drink, replayKey]);
+
+  return (
+    <div className="relative w-full h-60 sm:h-68 flex items-center justify-center">
+      <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+      {loading && (
+        <span className="absolute text-xs opacity-90 pointer-events-none">
+          Pouring 3D {drink}...
+        </span>
+      )}
+      {errorMsg && (
+        <span className="absolute text-xs text-red-200 pointer-events-none">
+          {errorMsg}
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function TeaCoffeeTreat({
   defaultName = "",
@@ -12,23 +332,6 @@ export default function TeaCoffeeTreat({
   const [selected, setSelected] = useState<DrinkType>(null);
   const [userName, setUserName] = useState<string>(defaultName);
   const [animKey, setAnimKey] = useState<number>(0);
-
-  // Load Google's <model-viewer> script once on the client
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (customElements.get("model-viewer")) return;
-    const existing = document.querySelector(
-      'script[data-model-viewer="true"]'
-    );
-    if (existing) return;
-
-    const script = document.createElement("script");
-    script.type = "module";
-    script.src =
-      "https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js";
-    script.setAttribute("data-model-viewer", "true");
-    document.head.appendChild(script);
-  }, []);
 
   // Sync if user signs in via Google/Guestbook or has a saved name in localStorage
   useEffect(() => {
@@ -63,7 +366,6 @@ export default function TeaCoffeeTreat({
 
   const displayName = userName.trim() || "Sweet Guest";
   const isTea = selected === "tea";
-  const modelSrc = isTea ? "/models/tea.glb" : "/models/coffee.glb";
 
   return (
     <div className="mt-4 flex flex-col items-center gap-3 w-full max-w-md mx-auto">
@@ -86,7 +388,7 @@ export default function TeaCoffeeTreat({
         </button>
       </div>
 
-      {/* Interactive 3D Cup + Animated User Name Card */}
+      {/* Interactive 3D Cup with Pouring & Filling Animation */}
       {selected && (
         <div
           key={animKey}
@@ -95,62 +397,27 @@ export default function TeaCoffeeTreat({
             animation: "psCupReveal 0.45s cubic-bezier(0.22, 1, 0.36, 1) both",
           }}
         >
-          {/* Close button */}
-          <button
-            type="button"
-            onClick={() => setSelected(null)}
-            aria-label="Close drink card"
-            className="px-2.5 py-1 rounded-full text-xs self-end cursor-pointer"
-          >
-            ✕
-          </button>
-
-          {/* Rising Steam + Interactive 3D Model Viewer */}
-          <div className="relative w-full flex flex-col items-center justify-center">
-            {/* Subtle Rising Steam above 3D Cup */}
-            <div className="flex items-end gap-2.5 h-6 -mb-2 z-10 pointer-events-none">
-              <span
-                className="w-1.5 h-5 rounded-full bg-white/75 block"
-                style={{
-                  animation: "psSteamRise 1.6s ease-in-out infinite",
-                }}
-              />
-              <span
-                className="w-1.5 h-6 rounded-full bg-white/85 block"
-                style={{
-                  animation: "psSteamRise 1.6s ease-in-out 0.35s infinite",
-                }}
-              />
-              <span
-                className="w-1.5 h-4 rounded-full bg-white/70 block"
-                style={{
-                  animation: "psSteamRise 1.6s ease-in-out 0.7s infinite",
-                }}
-              />
-            </div>
-
-            {/* Real 3D .glb Model */}
-            <div className="w-full h-56 sm:h-64 flex items-center justify-center">
-              {React.createElement("model-viewer" as any, {
-                src: modelSrc,
-                alt: isTea ? "3D Tea Cup" : "3D Coffee Cup",
-                "auto-rotate": true,
-                "rotation-per-second": "28deg",
-                "camera-controls": true,
-                "disable-zoom": false,
-                "shadow-intensity": "1.2",
-                "shadow-softness": "0.8",
-                exposure: "1.1",
-                "interaction-prompt": "none",
-                loading: "eager",
-                style: {
-                  width: "100%",
-                  height: "100%",
-                  backgroundColor: "transparent",
-                },
-              })}
-            </div>
+          {/* Top Controls: Pour Again + Close */}
+          <div className="w-full flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setAnimKey((prev) => prev + 1)}
+              className="px-3 py-1 rounded-full text-xs cursor-pointer"
+            >
+              ↻ Pour Again
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              aria-label="Close drink card"
+              className="px-2.5 py-1 rounded-full text-xs cursor-pointer"
+            >
+              ✕
+            </button>
           </div>
+
+          {/* 3D Cup + Animated Tea/Coffee Pour & Fill */}
+          <Cup3DScene drink={selected} replayKey={animKey} />
 
           {/* Animated User Name Badge */}
           <div
@@ -166,8 +433,8 @@ export default function TeaCoffeeTreat({
 
           <p className="text-xs sm:text-sm opacity-95">
             {isTea
-              ? `Fresh hot masala chai brewed with warmth for ${displayName}!`
-              : `Rich hot coffee brewed with love for ${displayName}!`}
+              ? `Fresh hot masala chai poured with warmth for ${displayName}!`
+              : `Rich hot coffee poured with love for ${displayName}!`}
           </p>
 
           <p className="text-[11px] opacity-80">
