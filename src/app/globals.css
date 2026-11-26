@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — KEEP EXISTING CONTAINERS + FL-5 ON CHAT MESSAGES
+   PARVATI-SITE — FL-1 CARDS, FL-2 BG, FL-3 BUTTONS, FL-4 GUESTBOOK, FL-5 MESSAGES
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
@@ -121,15 +121,20 @@ main select {
 }
 
 /* =========================================================
+   GUESTBOOK OUTER CONTAINER — FL-4.JPG TEXTURE
+   ========================================================= */
+html body main .ps-guestbook-container {
+  background-color: transparent !important;
+  background-image: var(--fl-4) !important;
+  background-size: 80px 80px !important;
+  background-repeat: repeat !important;
+  box-shadow: var(--shadow-3d-l1) !important;
+}
+
+/* =========================================================
    CHAT / GUESTBOOK MESSAGE BOXES ONLY — FL-5.JPG TEXTURE
    ========================================================= */
-html body main div[class*="overflow-y"] > div[class*="rounded"]:not(button):not([role="button"]),
-html body main div[class*="overflow-auto"] > div[class*="rounded"]:not(button):not([role="button"]),
-html body main div[class*="overflow-y"] > div > div[class*="rounded"]:not(button):not([role="button"]),
-html body main div[class*="overflow-auto"] > div > div[class*="rounded"]:not(button):not([role="button"]),
-html body main div[class*="max-h-"] > div[class*="rounded"]:not(button):not([role="button"]),
-html body main div[class*="max-h-"] > div > div[class*="rounded"]:not(button):not([role="button"]),
-html body main div[class*="space-y"] > div[class*="rounded"]:has(button):not(button):not([role="button"]) {
+html body main .ps-guestbook-msg {
   background-color: transparent !important;
   background-image: var(--fl-5) !important;
   background-size: 72px 72px !important;
@@ -231,6 +236,7 @@ main *:not([class*="animate"]):not([style*="animation"]) {
 [style*="animation"] {
   text-shadow: none !important;
 }
+
 /* =========================================================
    TEA & COFFEE CUP ANIMATIONS
    ========================================================= */

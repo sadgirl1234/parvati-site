@@ -15,6 +15,7 @@ import {
   LogIn,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import TeaCoffeeTreat from "@/components/TeaCoffeeTreat";
 
 interface GuestbookEntry {
   id: string | number;
@@ -706,6 +707,8 @@ export default function HomePage() {
             <p className="hd-smooth-text text-xs sm:text-sm font-medium text-rose-950/85 max-w-xs leading-relaxed">
               Warm vibes, playful moments, and sweet conversations anytime.
             </p>
+
+            <TeaCoffeeTreat defaultName={googleName} />
           </div>
 
           {/* Right: Rounded Lovely Video DP */}
@@ -765,7 +768,7 @@ export default function HomePage() {
         </div>
 
         {/* Cream & Pink Rounded Guestbook Section */}
-        <div className="max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-[#fffdf9]/95 border border-pink-200/90 shadow-lg shadow-pink-100/80 space-y-4 text-left">
+        <div className="ps-guestbook-container max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-[#fffdf9]/95 border border-pink-200/90 shadow-lg shadow-pink-100/80 space-y-4 text-left">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-pink-700">
               <BookOpen size={15} />
@@ -867,7 +870,7 @@ export default function HomePage() {
                 return (
                   <div
                     key={item.id}
-                    className="p-3.5 rounded-2xl bg-gradient-to-r from-[#fff8f3] to-pink-50/60 border border-pink-200/70 space-y-1.5"
+                    className="ps-guestbook-msg p-3.5 rounded-2xl bg-gradient-to-r from-[#fff8f3] to-pink-50/60 border border-pink-200/70 space-y-1.5"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
                       <span className="font-bold text-pink-800">
