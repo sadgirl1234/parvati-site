@@ -115,19 +115,7 @@ main form [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(but
 main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
 main textarea,
 main select {
-  background-size: 72px 72px !important;
-  box-shadow: var(--shadow-3d-l2) !important;
-}
-
-/* =========================================================
-   USER GUESTBOOK MESSAGE BOXES — FL-4.JPG TEXTURE + 3D SHADOW
-   ========================================================= */
-main [class*="overflow-y"] > div[class*="rounded"],
-main [class*="overflow-auto"] > div[class*="rounded"],
-main [class*="max-h-"] > div[class*="rounded"],
-main [class*="rounded"] [class*="space-y"] > div[class*="rounded"]:has(button) {
-  background-color: transparent !important;
-  background-image: var(--fl-4) !important;
+  background-image: var(--fl-1) !important;
   background-size: 72px 72px !important;
   background-repeat: repeat !important;
   box-shadow: var(--shadow-3d-l2) !important;
@@ -140,8 +128,27 @@ main [class*="rounded"] [class*="rounded"] [class*="rounded"]:not(img):not(svg):
 main [class*="rounded"] [class*="rounded"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
 main [class*="rounded"] [class*="rounded"] textarea,
 main [class*="rounded"] [class*="rounded"] select {
+  background-image: var(--fl-1) !important;
   background-size: 64px 64px !important;
+  background-repeat: repeat !important;
   box-shadow: var(--shadow-3d-l3) !important;
+}
+
+/* =========================================================
+   USER GUESTBOOK MESSAGE BOXES — FL-4.JPG TEXTURE + 3D SHADOW
+   ========================================================= */
+html body main div[class*="overflow-y"] > div[class*="rounded"]:not(button):not([role="button"]),
+html body main div[class*="overflow-auto"] > div[class*="rounded"]:not(button):not([role="button"]),
+html body main div[class*="overflow-y"] > div > div[class*="rounded"]:not(button):not([role="button"]),
+html body main div[class*="overflow-auto"] > div > div[class*="rounded"]:not(button):not([role="button"]),
+html body main div[class*="max-h-"] > div[class*="rounded"]:not(button):not([role="button"]),
+html body main div[class*="max-h-"] > div > div[class*="rounded"]:not(button):not([role="button"]),
+html body main div[class*="space-y"] > div[class*="rounded"]:has(button):not(button):not([role="button"]) {
+  background-color: transparent !important;
+  background-image: var(--fl-4) !important;
+  background-size: 72px 72px !important;
+  background-repeat: repeat !important;
+  box-shadow: var(--shadow-3d-l2) !important;
 }
 
 /* =========================================================
