@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — FL-1 NAV/FOOTER, FL-2 BG, FL-3 BUTTONS,
-                  FL-4 BIG BOXES, FL-5 SMALL BOXES
+   PARVATI-SITE — FL-1 BIG BOXES/NAV/FOOTER, FL-2 BG,
+                  FL-3 BUTTONS, FL-4 SMALL BOXES
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
@@ -98,7 +98,7 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   LEVEL 1 — BIG BOXES / MAIN CONTAINERS (fl-4 + DEEP 3D SHADOW)
+   LEVEL 1 — BIG BOXES / MAIN CONTAINERS (fl-1 + DEEP 3D SHADOW)
    ========================================================= */
 main [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
 main [class*="bg-white"]:not(img):not(svg):not(button):not([role="button"]),
@@ -113,7 +113,7 @@ main article,
 main form,
 html body main .ps-guestbook-container {
   background-color: transparent !important;
-  background-image: var(--fl-4) !important;
+  background-image: var(--fl-1) !important;
   background-size: 84px 84px !important;
   background-repeat: repeat !important;
   backdrop-filter: none !important;
@@ -124,7 +124,7 @@ html body main .ps-guestbook-container {
 }
 
 /* =========================================================
-   LEVEL 2 — SMALL / NESTED BOXES, MESSAGES & INPUTS (fl-5 + 3D SHADOW)
+   LEVEL 2 — SMALL / NESTED BOXES, MESSAGES & INPUTS (fl-4 + 3D SHADOW)
    ========================================================= */
 html body main [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
 html body main article [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
@@ -134,7 +134,7 @@ html body main input:not([type="checkbox"]):not([type="radio"]):not([type="range
 html body main textarea,
 html body main select {
   background-color: transparent !important;
-  background-image: var(--fl-5) !important;
+  background-image: var(--fl-4) !important;
   background-size: 68px 68px !important;
   background-repeat: repeat !important;
   backdrop-filter: none !important;
@@ -145,14 +145,14 @@ html body main select {
 }
 
 /* =========================================================
-   LEVEL 3+ — DEEPLY NESTED SMALL BOXES (fl-5 + LEVEL 3 3D SHADOW)
+   LEVEL 3+ — DEEPLY NESTED SMALL BOXES (fl-4 + LEVEL 3 3D SHADOW)
    ========================================================= */
 html body main [class*="rounded"] [class*="rounded"] [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
 html body main [class*="rounded"] [class*="rounded"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="button"]):not([type="submit"]):not([type="reset"]),
 html body main [class*="rounded"] [class*="rounded"] textarea,
 html body main [class*="rounded"] [class*="rounded"] select {
   background-color: transparent !important;
-  background-image: var(--fl-5) !important;
+  background-image: var(--fl-4) !important;
   background-size: 60px 60px !important;
   background-repeat: repeat !important;
   box-shadow: var(--shadow-3d-l3) !important;
