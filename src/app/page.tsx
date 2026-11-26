@@ -36,9 +36,7 @@ interface RosePetal {
   swayPhase: number;
   swaySpeed: number;
   swayAmp: number;
-  baseColor: string;
-  edgeColor: string;
-  highlightColor: string;
+  spriteIdx: number;
   alpha: number;
 }
 
@@ -85,54 +83,38 @@ function formatMessageDateTime(iso: string): string {
   });
 }
 
-function drawLovelyPetalWithShadow(ctx: CanvasRenderingContext2D, p: RosePetal) {
-  ctx.save();
-  ctx.translate(p.x, p.y);
-  ctx.rotate(p.rotation);
-  ctx.globalAlpha = p.alpha;
+// Pre-render each petal color once to an offscreen canvas (eliminates per-frame shadowBlur lag)
+function createPetalSprites(): HTMLCanvasElement[] {
+  return PETAL_COLORS.map((palette) => {
+    const c = document.createElement("canvas");
+    c.width = 40;
+    c.height = 40;
+    const ctx = c.getContext("2d");
+    if (ctx) {
+      ctx.translate(20, 20);
+      const r = 13;
+      const grad = ctx.createLinearGradient(-r, -r * 0.7, r, r * 0.7);
+      grad.addColorStop(0, palette.highlight);
+      grad.addColorStop(0.45, palette.base);
+      grad.addColorStop(1, palette.edge);
 
-  ctx.shadowColor = "rgba(190, 24, 93, 0.24)";
-  ctx.shadowBlur = Math.max(8, p.size * 0.9);
-  ctx.shadowOffsetX = 2;
-  ctx.shadowOffsetY = Math.max(5, p.size * 0.55);
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.85, 0);
+      ctx.bezierCurveTo(-r * 0.55, -r * 0.82, r * 0.45, -r * 0.75, r * 0.95, -r * 0.08);
+      ctx.bezierCurveTo(r * 0.65, r * 0.78, -r * 0.45, r * 0.82, -r * 0.85, 0);
+      ctx.closePath();
+      ctx.fill();
 
-  const r = p.size;
-  const grad = ctx.createLinearGradient(-r, -r * 0.7, r, r * 0.7);
-  grad.addColorStop(0, p.highlightColor);
-  grad.addColorStop(0.45, p.baseColor);
-  grad.addColorStop(1, p.edgeColor);
-
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.85, 0);
-  ctx.bezierCurveTo(
-    -r * 0.55,
-    -r * 0.82,
-    r * 0.45,
-    -r * 0.75,
-    r * 0.95,
-    -r * 0.08
-  );
-  ctx.bezierCurveTo(
-    r * 0.65,
-    r * 0.78,
-    -r * 0.45,
-    r * 0.82,
-    -r * 0.85,
-    0
-  );
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.shadowColor = "transparent";
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
-  ctx.lineWidth = 0.85;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.62, 0);
-  ctx.quadraticCurveTo(0, -r * 0.1, r * 0.62, 0);
-  ctx.stroke();
-
-  ctx.restore();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+      ctx.lineWidth = 0.85;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.62, 0);
+      ctx.quadraticCurveTo(0, -r * 0.1, r * 0.62, 0);
+      ctx.stroke();
+    }
+    return c;
+  });
 }
 
 export default function HomePage() {
@@ -194,39 +176,38 @@ export default function HomePage() {
   useEffect(() => {
     const canvas = petalCanvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
+
+    const sprites = createPetalSprites();
+    const PETAL_COUNT = 20;
 
     let width = (canvas.width = window.innerWidth);
     let height = (canvas.height = window.innerHeight);
 
     const makePetal = (fromTop: boolean, index?: number): RosePetal => {
-      const palette =
-        PETAL_COLORS[Math.floor(Math.random() * PETAL_COLORS.length)];
       const baseX =
         typeof index === "number"
-          ? ((index + 0.5) / 38) * width + (Math.random() - 0.5) * 32
+          ? ((index + 0.5) / PETAL_COUNT) * width + (Math.random() - 0.5) * 40
           : Math.random() * width;
 
       return {
         x: ((baseX % width) + width) % width,
-        y: fromTop ? -20 - Math.random() * 90 : Math.random() * height,
+        y: fromTop ? -20 - Math.random() * 80 : Math.random() * height,
         vx: (Math.random() - 0.5) * 0.22,
-        vy: 0.26 + Math.random() * 0.24,
-        size: 8.5 + Math.random() * 6.5,
+        vy: 0.3 + Math.random() * 0.26,
+        size: 16 + Math.random() * 12,
         rotation: Math.random() * Math.PI * 2,
         vRot: (Math.random() - 0.5) * 0.012,
         swayPhase: Math.random() * Math.PI * 2,
         swaySpeed: 0.012 + Math.random() * 0.01,
         swayAmp: 0.35 + Math.random() * 0.45,
-        baseColor: palette.base,
-        edgeColor: palette.edge,
-        highlightColor: palette.highlight,
+        spriteIdx: Math.floor(Math.random() * sprites.length),
         alpha: 0.72 + Math.random() * 0.2,
       };
     };
 
-    petalsRef.current = Array.from({ length: 38 }, (_, idx) =>
+    petalsRef.current = Array.from({ length: PETAL_COUNT }, (_, idx) =>
       makePetal(false, idx)
     );
 
@@ -242,6 +223,9 @@ export default function HomePage() {
     let breeze = 0;
 
     const animatePetals = () => {
+      rafId = window.requestAnimationFrame(animatePetals);
+      if (document.hidden) return;
+
       breeze += 0.004;
       const gentleBreeze = Math.sin(breeze) * 0.25;
 
@@ -262,10 +246,14 @@ export default function HomePage() {
           continue;
         }
 
-        drawLovelyPetalWithShadow(ctx, p);
+        const sprite = sprites[p.spriteIdx];
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation);
+        ctx.globalAlpha = p.alpha;
+        ctx.drawImage(sprite, -p.size / 2, -p.size / 2, p.size, p.size);
+        ctx.restore();
       }
-
-      rafId = window.requestAnimationFrame(animatePetals);
     };
 
     rafId = window.requestAnimationFrame(animatePetals);
@@ -450,20 +438,8 @@ export default function HomePage() {
   });
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-b from-pink-100/80 via-[#fff9f5] to-rose-100/80 text-rose-950 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden selection:bg-pink-500 selection:text-white">
+    <div className="min-h-screen w-full text-rose-950 flex flex-col items-center justify-center px-4 py-12 relative overflow-hidden selection:bg-pink-500 selection:text-white">
       <style jsx>{`
-        @keyframes lovelyGlow {
-          0% {
-            background-position: 0% 50%;
-          }
-          50% {
-            background-position: 100% 50%;
-          }
-          100% {
-            background-position: 0% 50%;
-          }
-        }
-
         @keyframes borderOrbit {
           0% {
             transform: rotate(0deg);
@@ -473,59 +449,37 @@ export default function HomePage() {
           }
         }
 
-        @keyframes cuteNameFloat {
-          0%,
-          100% {
-            transform: translate3d(0, 0, 0) scale(1);
-          }
-          50% {
-            transform: translate3d(0, -4px, 0) scale(1.025);
-          }
-        }
-
         @keyframes smoothFlowerSwayLeft {
           0%,
           100% {
-            transform: translate3d(0, 0, 0) rotate(-10deg) scale(1);
+            transform: translate3d(0, 0, 0) rotate(-10deg);
           }
           50% {
-            transform: translate3d(0, -6px, 0) rotate(12deg) scale(1.1);
+            transform: translate3d(0, -5px, 0) rotate(10deg);
           }
         }
 
         @keyframes smoothFlowerSwayRight {
           0%,
           100% {
-            transform: translate3d(0, 0, 0) rotate(10deg) scale(1);
+            transform: translate3d(0, 0, 0) rotate(10deg);
           }
           50% {
-            transform: translate3d(0, -6px, 0) rotate(-12deg) scale(1.1);
+            transform: translate3d(0, -5px, 0) rotate(-10deg);
           }
         }
 
         @keyframes smoothBloomTurn {
           0% {
-            transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
-          }
-          50% {
-            transform: translate3d(0, -4px, 0) rotate(180deg) scale(1.14);
+            transform: rotate(0deg);
           }
           100% {
-            transform: translate3d(0, 0, 0) rotate(360deg) scale(1);
+            transform: rotate(360deg);
           }
         }
 
         .lovely-ring {
-          background: linear-gradient(
-            135deg,
-            #f472b6,
-            #fb7185,
-            #fde68a,
-            #f9a8d4,
-            #f43f5e
-          );
-          background-size: 250% 250%;
-          animation: lovelyGlow 6s ease infinite;
+          background: linear-gradient(135deg, #f472b6, #fb7185, #fde68a, #f43f5e);
         }
 
         .thin-rotating-name-shell {
@@ -547,83 +501,35 @@ export default function HomePage() {
             #e11d48,
             #ec4899
           );
-          animation: borderOrbit 4.5s linear infinite;
+          animation: borderOrbit 5s linear infinite;
+          will-change: transform;
         }
 
         .thin-rotating-name-inner {
           position: relative;
           z-index: 1;
           border-radius: 9999px;
-          background: rgba(255, 253, 249, 0.94);
           padding: 0.45rem 1.25rem;
         }
 
-        .hd-animated-name {
-          background: linear-gradient(
-            110deg,
-            #be123c 0%,
-            #db2777 24%,
-            #f43f5e 48%,
-            #b45309 72%,
-            #9d174d 100%
-          );
-          background-size: 260% 260%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-          text-rendering: geometricPrecision;
-          animation: lovelyGlow 5s cubic-bezier(0.4, 0, 0.2, 1) infinite,
-            cuteNameFloat 3.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-        }
-
-        .hd-smooth-text {
-          -webkit-font-smoothing: antialiased;
-          -moz-osx-font-smoothing: grayscale;
-          text-rendering: geometricPrecision;
-        }
-
         .hd-flower-4k {
-          -webkit-font-smoothing: antialiased;
-          text-rendering: geometricPrecision;
           will-change: transform;
-          filter: contrast(1.18) saturate(1.28)
-            drop-shadow(0 6px 12px rgba(157, 23, 77, 0.34))
-            drop-shadow(0 0 6px rgba(255, 255, 255, 0.7));
         }
 
         .flower-sway-left {
-          animation: smoothFlowerSwayLeft 3.4s cubic-bezier(0.4, 0, 0.2, 1)
-            infinite;
+          animation: smoothFlowerSwayLeft 3.4s ease-in-out infinite;
         }
 
         .flower-sway-right {
-          animation: smoothFlowerSwayRight 3.4s cubic-bezier(0.4, 0, 0.2, 1)
-            infinite 0.85s;
+          animation: smoothFlowerSwayRight 3.4s ease-in-out infinite 0.85s;
         }
 
         .flower-bloom-spin {
-          animation: smoothBloomTurn 8.5s cubic-bezier(0.4, 0, 0.2, 1)
-            infinite;
+          animation: smoothBloomTurn 8.5s linear infinite;
         }
       `}</style>
 
-      {/* Soft Pinkish & Cream Ambient Glows */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-20 bg-gradient-to-b from-pink-100/80 via-[#fff9f5] to-rose-100/80"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed -top-24 left-1/4 w-96 h-96 rounded-full bg-pink-200/45 blur-3xl -z-10"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed bottom-0 right-1/4 w-96 h-96 rounded-full bg-amber-100/60 blur-3xl -z-10"
-      />
-
-      {/* Continuous Slow-Falling Rose Petals with Shadows */}
+      {/* Pre-rendered Falling Rose Petals (zero shadowBlur lag) */}
       <canvas
         ref={petalCanvasRef}
         aria-hidden="true"
@@ -631,12 +537,12 @@ export default function HomePage() {
       />
 
       <div className="relative z-10 max-w-5xl w-full flex flex-col items-center text-center space-y-8">
-        {/* Top Showcase Row: parvati.jpg DP (Left) | Kumari Parvati Singh (Center) | Video DP (Right) */}
+        {/* Top Showcase Row */}
         <div className="w-full grid grid-cols-1 md:grid-cols-3 items-center gap-6 md:gap-4">
-          {/* Left: Rounded Lovely parvati.jpg Profile Image */}
+          {/* Left: Profile Image */}
           <div className="flex flex-col items-center justify-center">
-            <div className="relative p-1.5 rounded-full lovely-ring shadow-lg shadow-pink-200/70">
-              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-[#fffdf9] relative ring-2 ring-[#fffdf9]">
+            <div className="relative p-1.5 rounded-full lovely-ring">
+              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-[#fffdf9] relative">
                 <img
                   src={dpSrc}
                   alt="Kumari Parvati Singh"
@@ -651,7 +557,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Center: Continuously Rotating Thin Border Around Kumari Parvati Singh */}
+          {/* Center: Name + Tea/Coffee */}
           <div className="flex flex-col items-center justify-center space-y-2.5 px-3 py-3">
             <div
               aria-hidden="true"
@@ -668,7 +574,7 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="thin-rotating-name-shell shadow-sm shadow-pink-200/70">
+            <div className="thin-rotating-name-shell">
               <div aria-hidden="true" className="thin-rotating-name-beam" />
               <div className="thin-rotating-name-inner flex items-center justify-center gap-2">
                 <span
@@ -704,17 +610,17 @@ export default function HomePage() {
               </span>
             </div>
 
-            <p className="hd-smooth-text text-xs sm:text-sm font-medium text-rose-950/85 max-w-xs leading-relaxed">
+            <p className="text-xs sm:text-sm font-medium max-w-xs leading-relaxed">
               Warm vibes, playful moments, and sweet conversations anytime.
             </p>
 
             <TeaCoffeeTreat defaultName={googleName} />
           </div>
 
-          {/* Right: Rounded Lovely Video DP */}
+          {/* Right: Video DP */}
           <div className="flex flex-col items-center justify-center">
-            <div className="relative p-1.5 rounded-full lovely-ring shadow-lg shadow-pink-200/70">
-              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-[#fffdf9] relative ring-2 ring-[#fffdf9]">
+            <div className="relative p-1.5 rounded-full lovely-ring">
+              <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden bg-[#fffdf9] relative">
                 <video
                   ref={dpVideoRef}
                   src="/videos/sweetie-dp.mp4"
@@ -731,7 +637,7 @@ export default function HomePage() {
                 onClick={() => setMuted((prev) => !prev)}
                 aria-label={muted ? "Unmute DP video" : "Mute DP video"}
                 title={muted ? "Unmute sound" : "Mute sound"}
-                className="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-[#fffdf9] hover:bg-pink-500 text-rose-600 hover:text-white border border-pink-200 flex items-center justify-center shadow-md transition-colors cursor-pointer"
+                className="absolute bottom-2 right-2 w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
               >
                 {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
               </button>
@@ -739,14 +645,14 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Cream & Pink Rounded Love Notes Card */}
-        <div className="max-w-xl w-full p-5 sm:p-6 rounded-3xl bg-[#fffdf9]/95 border border-pink-200/90 shadow-md shadow-pink-100/80 space-y-3">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-pink-100/80 text-xs font-mono font-bold uppercase tracking-wider text-pink-700">
+        {/* Love Notes Card */}
+        <div className="max-w-xl w-full p-5 sm:p-6 rounded-3xl space-y-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider">
             <Heart size={13} className="fill-pink-500 text-pink-500" />
             <span>Love Notes</span>
           </div>
 
-          <p className="hd-smooth-text text-sm sm:text-base text-rose-950/85 italic leading-relaxed">
+          <p className="text-sm sm:text-base italic leading-relaxed">
             &ldquo;{LOVE_NOTES[noteIdx]}&rdquo;
           </p>
 
@@ -758,22 +664,20 @@ export default function HomePage() {
                 onClick={() => setNoteIdx(idx)}
                 aria-label={`Show love note ${idx + 1}`}
                 className={`h-2.5 rounded-full transition-all cursor-pointer ${
-                  noteIdx === idx
-                    ? "w-7 bg-gradient-to-r from-pink-500 to-rose-400"
-                    : "w-2.5 bg-pink-200 hover:bg-pink-300"
+                  noteIdx === idx ? "w-7" : "w-2.5"
                 }`}
               />
             ))}
           </div>
         </div>
 
-        {/* Cream & Pink Rounded Guestbook Section */}
-        <div className="ps-guestbook-container max-w-2xl w-full p-5 sm:p-6 rounded-3xl bg-[#fffdf9]/95 border border-pink-200/90 shadow-lg shadow-pink-100/80 space-y-4 text-left">
+        {/* Guestbook Section */}
+        <div className="ps-guestbook-container max-w-2xl w-full p-5 sm:p-6 rounded-3xl space-y-4 text-left">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-pink-700">
+            <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider">
               <BookOpen size={15} />
               <span>Guestbook ({entries.length})</span>
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100/90 border border-amber-200 text-rose-700 text-[10px]">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px]">
                 <Heart size={11} className="fill-pink-500 text-pink-500" />{" "}
                 {totalLikes} likes
               </span>
@@ -785,7 +689,7 @@ export default function HomePage() {
                 onClick={() =>
                   setSortBy((prev) => (prev === "newest" ? "likes" : "newest"))
                 }
-                className="px-3 py-1 rounded-full bg-pink-100/80 hover:bg-pink-200/80 border border-pink-200 text-[11px] font-mono font-bold text-pink-800 transition-colors cursor-pointer"
+                className="px-3 py-1 rounded-full text-[11px] font-mono font-bold cursor-pointer"
               >
                 {sortBy === "newest" ? "Sort: Newest" : "Sort: Top Likes"}
               </button>
@@ -794,7 +698,7 @@ export default function HomePage() {
                 type="button"
                 onClick={() => void fetchGuestbookFromDb(true)}
                 aria-label="Refresh guestbook"
-                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-amber-50 hover:bg-amber-100 border border-amber-200 text-[11px] font-mono font-bold text-rose-800 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-mono font-bold cursor-pointer"
               >
                 <RefreshCw
                   size={11}
@@ -806,18 +710,18 @@ export default function HomePage() {
           </div>
 
           {!authChecked ? (
-            <div className="p-4 rounded-2xl bg-[#fff8f3] border border-pink-200 text-xs font-mono text-rose-700 text-center">
+            <div className="p-4 rounded-2xl text-xs font-mono text-center">
               Checking Google login status...
             </div>
           ) : !authUser ? (
-            <div className="p-4 rounded-2xl bg-gradient-to-r from-[#fff8f3] to-pink-50 border border-pink-200 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-rose-900 font-medium">
+            <div className="p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs font-medium">
                 Sign in with your Google account to post a guestbook message.
               </p>
               <button
                 type="button"
                 onClick={() => router.push("/ai")}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full font-mono text-xs font-bold cursor-pointer"
               >
                 <LogIn size={13} />
                 <span>Login with Google</span>
@@ -828,17 +732,17 @@ export default function HomePage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div
                   title="Name synced from your Google account"
-                  className="px-4 py-2.5 rounded-2xl bg-pink-50/90 border border-pink-200 text-xs font-mono font-bold text-pink-900 flex items-center justify-between gap-2 select-none"
+                  className="px-4 py-2.5 rounded-2xl text-xs font-mono font-bold flex items-center justify-between gap-2 select-none"
                 >
                   <span className="truncate">{googleName}</span>
-                  <Lock size={12} className="text-pink-500 shrink-0" />
+                  <Lock size={12} className="shrink-0" />
                 </div>
                 <input
                   type="text"
                   value={guestMessage}
                   onChange={(e) => setGuestMessage(e.target.value)}
                   placeholder="Write a sweet message..."
-                  className="sm:col-span-2 px-4 py-2.5 rounded-2xl bg-[#fff8f3] border border-pink-200 focus:border-pink-400 focus:bg-white focus:outline-none text-xs text-rose-950 placeholder:text-rose-400/70"
+                  className="sm:col-span-2 px-4 py-2.5 rounded-2xl focus:outline-none text-xs"
                 />
               </div>
 
@@ -846,7 +750,7 @@ export default function HomePage() {
                 <button
                   type="submit"
                   disabled={submitting || !guestMessage.trim()}
-                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-mono text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full font-mono text-xs font-bold cursor-pointer disabled:opacity-50"
                 >
                   <Send size={13} />
                   <span>{submitting ? "Posting..." : "Post Note"}</span>
@@ -855,10 +759,10 @@ export default function HomePage() {
             </form>
           )}
 
-          {/* All Guestbook Messages from parvati_guestbook */}
-          <div className="space-y-2.5 max-h-72 overflow-y-auto pt-3 border-t border-pink-100 pr-1">
+          {/* Guestbook Messages */}
+          <div className="space-y-2.5 max-h-72 overflow-y-auto pt-3 pr-1">
             {displayedEntries.length === 0 ? (
-              <p className="text-xs text-rose-800/60 text-center py-3">
+              <p className="text-xs text-center py-3">
                 No guestbook messages yet. Be the first to post!
               </p>
             ) : (
@@ -870,37 +774,25 @@ export default function HomePage() {
                 return (
                   <div
                     key={item.id}
-                    className="ps-guestbook-msg p-3.5 rounded-2xl bg-gradient-to-r from-[#fff8f3] to-pink-50/60 border border-pink-200/70 space-y-1.5"
+                    className="ps-guestbook-msg p-3.5 rounded-2xl space-y-1.5"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
-                      <span className="font-bold text-pink-800">
-                        {item.name}
-                      </span>
-                      <span className="text-rose-400">
-                        {formatMessageDateTime(item.created_at)}
-                      </span>
+                      <span className="font-bold">{item.name}</span>
+                      <span>{formatMessageDateTime(item.created_at)}</span>
                     </div>
 
-                    <p className="hd-smooth-text text-xs text-rose-950/85 leading-relaxed">
-                      {item.message}
-                    </p>
+                    <p className="text-xs leading-relaxed">{item.message}</p>
 
                     <div className="flex items-center justify-end pt-0.5">
                       <button
                         type="button"
                         onClick={() => handleToggleLike(item)}
                         aria-label={isLiked ? "Unlike message" : "Like message"}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold transition-colors cursor-pointer ${
-                          isLiked
-                            ? "bg-pink-500 text-white shadow-xs"
-                            : "bg-[#fffdf9] hover:bg-pink-100/70 text-rose-700 border border-pink-200"
-                        }`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-bold cursor-pointer"
                       >
                         <ThumbsUp
                           size={12}
-                          className={
-                            isLiked ? "fill-white text-white" : ""
-                          }
+                          className={isLiked ? "fill-white text-white" : ""}
                         />
                         <span>{likeCount}</span>
                       </button>

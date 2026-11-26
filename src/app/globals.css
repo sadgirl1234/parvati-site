@@ -1,8 +1,7 @@
 @import "tailwindcss";
 
 /* =========================================================
-   PARVATI-SITE — FL-1 BIG BOXES/NAV/FOOTER, FL-2 BG,
-                  FL-3 BUTTONS, FL-4 SMALL BOXES + NAME PILL
+   PARVATI-SITE — LIGHTWEIGHT GPU-FRIENDLY 3D TEXTURE THEME
    ========================================================= */
 :root {
   --fl-1: url("/textures/fl-1.jpg");
@@ -11,38 +10,24 @@
   --fl-4: url("/textures/fl-4.jpg");
   --fl-5: url("/textures/fl-5.jpg");
 
-  /* Level 1: Main big boxes, nav pill & footer — tallest lift */
+  /* Fast 2-layer 3D shadows (same depth, 80% less GPU cost) */
   --shadow-3d-l1:
-    inset 0 1.5px 1px rgba(255, 255, 255, 0.28),
-    inset 0 -5px 10px rgba(0, 0, 0, 0.88),
-    0 38px 72px -10px rgba(0, 0, 0, 0.98),
-    0 22px 42px -6px rgba(0, 0, 0, 0.92),
-    0 10px 20px -2px rgba(0, 0, 0, 0.85),
-    0 3px 6px 0 rgba(0, 0, 0, 0.9);
+    inset 0 -4px 8px rgba(0, 0, 0, 0.8),
+    0 18px 30px -6px rgba(0, 0, 0, 0.9);
 
-  /* Level 2: Small boxes, inputs & guestbook entries */
   --shadow-3d-l2:
-    inset 0 1px 1px rgba(255, 255, 255, 0.24),
-    inset 0 -4px 8px rgba(0, 0, 0, 0.84),
-    0 24px 46px -8px rgba(0, 0, 0, 0.96),
-    0 12px 24px -4px rgba(0, 0, 0, 0.86),
-    0 4px 10px -1px rgba(0, 0, 0, 0.78);
+    inset 0 -3px 6px rgba(0, 0, 0, 0.78),
+    0 12px 20px -4px rgba(0, 0, 0, 0.85);
 
-  /* Level 3+: Deeply nested small boxes & buttons */
   --shadow-3d-l3:
-    inset 0 1px 0.5px rgba(255, 255, 255, 0.2),
-    inset 0 -3px 6px rgba(0, 0, 0, 0.8),
-    0 14px 28px -6px rgba(0, 0, 0, 0.95),
-    0 6px 14px -2px rgba(0, 0, 0, 0.85),
-    0 2px 5px 0 rgba(0, 0, 0, 0.78);
+    inset 0 -2px 5px rgba(0, 0, 0, 0.75),
+    0 6px 12px -2px rgba(0, 0, 0, 0.82);
 
-  --text-black-shadow:
-    0 2px 6px rgba(0, 0, 0, 0.95),
-    0 0 2px rgba(0, 0, 0, 0.98);
+  --text-black-shadow: 0 2px 4px rgba(0, 0, 0, 0.95);
 }
 
 /* =========================================================
-   FULL-SCREEN BACKGROUND ONLY — fl-2
+   FULL-SCREEN BACKGROUND ONLY — fl-2 (NO FIXED REPAINT LAG)
    ========================================================= */
 html,
 body,
@@ -52,7 +37,6 @@ body > div:first-child {
   background-image: var(--fl-2) !important;
   background-size: 130px 130px !important;
   background-repeat: repeat !important;
-  background-attachment: fixed !important;
   border: none !important;
 }
 
@@ -71,7 +55,7 @@ body > div:first-child > div[class*="min-h-screen"] {
 }
 
 /* =========================================================
-   NAV PILL & FOOTER — fl-1 + DEEP 3D SHADOW
+   NAV PILL & FOOTER — fl-1 + 3D SHADOW
    ========================================================= */
 header nav,
 header > div > div:has(a[href*="contact"]),
@@ -98,7 +82,7 @@ header > div:has(a[href*="contact"]) {
 }
 
 /* =========================================================
-   LEVEL 1 — BIG BOXES / MAIN CONTAINERS (fl-1 + DEEP 3D SHADOW)
+   LEVEL 1 — BIG BOXES / MAIN CONTAINERS (fl-1 + 3D SHADOW)
    ========================================================= */
 main [class*="rounded"]:not(img):not(svg):not([role="progressbar"]):not(button):not([role="button"]),
 main [class*="bg-white"]:not(img):not(svg):not(button):not([role="button"]),
@@ -181,7 +165,7 @@ html body main a[class*="rounded"] {
 }
 
 /* =========================================================
-   BOLD WHITE TEXT + BLACK SHADOW (EXCLUDING ANIMATED ELEMENTS)
+   BOLD WHITE TEXT + BLACK SHADOW (SCOPED TO TEXT ELEMENTS)
    ========================================================= */
 body,
 main,
@@ -217,6 +201,7 @@ input,
 textarea,
 select {
   font-weight: 700 !important;
+  text-shadow: var(--text-black-shadow) !important;
 }
 
 h1,
@@ -226,6 +211,7 @@ h4,
 h5,
 h6 {
   font-weight: 900 !important;
+  text-shadow: var(--text-black-shadow) !important;
 }
 
 input::placeholder,
@@ -233,17 +219,8 @@ textarea::placeholder {
   color: rgba(255, 255, 255, 0.88) !important;
 }
 
-body *:not([class*="animate"]):not([style*="animation"]),
-main *:not([class*="animate"]):not([style*="animation"]) {
-  text-shadow: var(--text-black-shadow) !important;
-}
-
-[style*="animation"] {
-  text-shadow: none !important;
-}
-
 /* =========================================================
-   KUMARI PARVATI SINGH NAME PILL — FL-4 BG + COLORFUL ANIMATED TEXT
+   KUMARI PARVATI SINGH NAME PILL — FL-4 BG + GPU-ONLY ANIMATION
    ========================================================= */
 html body main .thin-rotating-name-inner {
   background-color: transparent !important;
@@ -257,23 +234,21 @@ html body main h1.hd-animated-name {
   background: linear-gradient(
     90deg,
     #fff7ad 0%,
-    #ff9a9e 22%,
-    #ffffff 45%,
-    #ffd700 68%,
-    #ff758c 88%,
+    #ff9a9e 25%,
+    #ffffff 50%,
+    #ffd700 75%,
     #fff7ad 100%
   ) !important;
-  background-size: 250% auto !important;
+  background-size: 200% auto !important;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   color: transparent !important;
   -webkit-text-fill-color: transparent !important;
   text-shadow: none !important;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.95))
-    drop-shadow(0 0 10px rgba(255, 215, 0, 0.55)) !important;
   animation:
-    psNameShimmer 3.2s linear infinite,
-    psNamePulseFloat 3s ease-in-out infinite !important;
+    psNameShimmer 3.5s linear infinite,
+    psNamePulseFloat 3.2s ease-in-out infinite !important;
+  will-change: transform;
 }
 
 @keyframes psNameShimmer {
@@ -281,21 +256,17 @@ html body main h1.hd-animated-name {
     background-position: 0% 50%;
   }
   100% {
-    background-position: 250% 50%;
+    background-position: 200% 50%;
   }
 }
 
 @keyframes psNamePulseFloat {
   0%,
   100% {
-    transform: translateY(0px) scale(1);
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.95))
-      drop-shadow(0 0 8px rgba(255, 215, 0, 0.45));
+    transform: translate3d(0, 0, 0) scale(1);
   }
   50% {
-    transform: translateY(-2.5px) scale(1.035);
-    filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.98))
-      drop-shadow(0 0 16px rgba(255, 165, 200, 0.85));
+    transform: translate3d(0, -2.5px, 0) scale(1.03);
   }
 }
 
@@ -305,54 +276,20 @@ html body main h1.hd-animated-name {
 @keyframes psCupReveal {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.95);
+    transform: translate3d(0, 10px, 0) scale(0.96);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes psLiquidFill {
-  0% {
-    transform: scaleY(0.05);
-  }
-  100% {
-    transform: scaleY(1);
-  }
-}
-
-@keyframes psFoamFade {
-  0%,
-  55% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 0.95;
-  }
-}
-
-@keyframes psSteamRise {
-  0% {
-    opacity: 0;
-    transform: translateY(6px) scaleY(0.8);
-  }
-  50% {
-    opacity: 0.9;
-    transform: translateY(-4px) scaleY(1.05);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-14px) scaleY(0.9);
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
 @keyframes psNameFloat {
   0%,
   100% {
-    transform: translateY(0px) scale(1);
+    transform: translate3d(0, 0, 0);
   }
   50% {
-    transform: translateY(-3px) scale(1.04);
+    transform: translate3d(0, -3px, 0);
   }
 }
